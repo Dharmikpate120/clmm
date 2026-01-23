@@ -1,9 +1,5 @@
-// In src/error.rs
-
-use num_derive::FromPrimitive;
 use num_enum;
 use spl_program_error::spl_program_error;
-use thiserror::Error;
 
 #[spl_program_error(hash_error_code_start = 3058088441)]
 pub enum AMMError {
@@ -40,6 +36,8 @@ pub enum AMMError {
     #[error("invalid spl token program account provided")]
     InvalidSPLTokenProgram,
 
+    #[error("invalid MPL core program account provided")]
+    InvalidMPL_CoreProgram,
     #[error("invalid lp token mint account provided")]
     InvalidLPTokenMintAccount,
 
@@ -56,23 +54,3 @@ pub enum AMMError {
     PriceTooHigh
 }
 
-// Implement the conversion from `CounterError` to `ProgramError`.
-// This allows us to use `?` to propagate our custom errors.
-// impl From<StakeError> for ProgramError {
-//     fn from(e: CounterError) -> Self {
-//         // Log the error message
-//         e.print::<Self>();
-//         // Convert the enum variant to its `u32` representation
-//         // and wrap it in `ProgramError::Custom`.
-//         ProgramError::Custom(e as u32)
-//     }
-// }
-
-// impl<T> PrintProgramError<T> for CounterError
-// where
-//     T: 'static + std::error::Error + DecodeError<T> + FromPrimitive,
-// {
-//     fn print(&self) {
-//         solana_program::msg!("Error: {}", self);
-//     }
-// }

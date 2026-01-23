@@ -1,35 +1,19 @@
-use crate::{ error::AMMError, state::{ AMMAccount } };
-use num_traits::Float;
+use crate::{
+    error::AMMError,
+    formulas::{ price_to_tick_index, value_to_sqrt_q6464 },
+    state::AMMAccount,
+};
 use solana_program::{
     account_info::{ AccountInfo, next_account_info },
-    config::program,
     entrypoint::ProgramResult,
     msg,
-    program::invoke_signed,
     program_pack::IsInitialized,
     pubkey::Pubkey,
     rent::Rent,
     sysvar::Sysvar,
 };
-use borsh::{ BorshSerialize, BorshDeserialize };
 use solana_program::program_pack::Pack;
-use solana_system_interface::instruction;
-use bstr::concat;
 use spl_token_interface::state::AccountState;
-
-#[derive(BorshSerialize, BorshDeserialize)]
-struct System_Instruction {
-    pub lamports: u64,
-    pub space: u64,
-    pub owner: Pubkey,
-}
-
-// pub fn create_system_program_account(
-//     instData: System_Instruction,
-//     accounts: &[AccountInfo]
-// ) -> Result<(), AMMError> {
-//     Ok(())
-// }
 
 pub struct Processor;
 
@@ -37,39 +21,74 @@ impl Processor {
     pub fn initialize_token_pool_account(
         program_id: &Pubkey,
         accounts: &[AccountInfo],
-        trade_fee: u64,
-        initial_token_a_liquidity: u64,
-        initial_token_b_liquidity: u64
+        token_a_amount: u64,
+        token_b_amount: u64,
+        start_tick: u32,
+        end_tick: u32
     ) -> ProgramResult {
         let account_iter = &mut accounts.iter();
+
+        // 0. admin account (signer, writable)
         let admin_account = next_account_info(account_iter)?;
 
+        // 1. system program account: 11111111111111111111111111111111 (read only)
         let system_program_account = next_account_info(account_iter)?;
 
+        // 2. spl token program account: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA (read only)
         let spl_token_program_account = next_account_info(account_iter)?;
 
+        // 3. token A mint account (read only)
         let token_a_mint_account = next_account_info(account_iter)?;
 
+        // 4. token B mint account (read only)
         let token_b_mint_account = next_account_info(account_iter)?;
 
+        // 5. admin token A account (writable)
         let admin_token_a_account = next_account_info(account_iter)?;
 
+        // 6. admin token B account (writable)
         let admin_token_b_account = next_account_info(account_iter)?;
 
+        // 7. lp_token_mint_account (writable)
         let lp_token_mint_account = next_account_info(account_iter)?;
 
+        // 8. admin lp token account (writable)
         let admin_lp_token_account = next_account_info(account_iter)?;
 
+        // 9. token A pool account (writable)
         let token_a_pool_account = next_account_info(account_iter)?;
 
+        // 10. token B pool account (writable)
         let token_b_pool_account = next_account_info(account_iter)?;
 
+        // 11. amm_token_account (writable)
         let amm_token_account = next_account_info(account_iter)?;
 
+        // 12. sysvar_rent_account : SysvarRent111111111111111111111111111111111 (read only)
         let sysvar_rent_account = next_account_info(account_iter)?;
 
+        //13. amm_program_account (read only)
         let amm_program_account = next_account_info(account_iter)?;
 
+        //14. nft_mint_account (writable)
+        let nft_mint_account = next_account_info(account_iter)?;
+
+        //15. nft_token_account (writable)
+        let nft_token_account = next_account_info(account_iter)?;
+
+        //16. metaplex_core_program_account(read only)
+        let metaplex_core_program_account = next_account_info(account_iter)?;
+
+        //17. possition_account(writable)
+        let possition_account = next_account_info(account_iter)?;
+
+        //18.first_tick_array_account(writable)
+        let first_tick_array_account = next_account_info(account_iter)?;
+
+        //19.last_tick_array_account
+        let last_tick_array_account = next_account_info(account_iter)?;
+
+        //verifying accounts access--------------------------------------------------------------------------------------
         if admin_account.is_signer == false {
             msg!("Error: Admin account is not a signer");
             return Err(AMMError::InvalidSigner.into());
@@ -84,7 +103,10 @@ impl Processor {
             msg!("Error: SPL token program account is invalid");
             return Err(AMMError::InvalidSPLTokenProgram.into());
         }
-
+        if *metaplex_core_program_account.key.to_string() != mpl_core::ID.to_string() {
+            msg!("Error: Metaplex core program account is invalid");
+            return Err(AMMError::InvalidMPL_CoreProgram.into());
+        }
         if admin_token_a_account.is_writable == false || admin_token_b_account.is_writable == false {
             msg!("Error: Admin token A account is not writable");
             return Err(AMMError::NotWritable.into());
@@ -105,6 +127,25 @@ impl Processor {
             msg!("Error: AMM token accoutn is not writable!");
             return Err(AMMError::NotWritable.into());
         }
+
+        if nft_mint_account.is_writable == false || nft_token_account.is_writable == false {
+            msg!("Error: nft token | mint account is not writable");
+            return Err(AMMError::NotWritable.into());
+        }
+
+        if possition_account.is_writable == false {
+            msg!("Error: position account is not writable");
+            return Err(AMMError::NotWritable.into());
+        }
+        if
+            first_tick_array_account.is_writable == false ||
+            last_tick_array_account.is_writable == false
+        {
+            msg!("Error: tick array account is not writable");
+            return Err(AMMError::NotWritable.into());
+        }
+
+        //verifying accounts data--------------------------------------------------------------------------------------
 
         let admin_token_a_data = spl_token_interface::state::Account::unpack_from_slice(
             admin_token_a_account.data.borrow().as_ref()
@@ -130,10 +171,7 @@ impl Processor {
             return Err(AMMError::TokenAccountNotInitialized.into());
         }
 
-        if
-            admin_token_a_data.amount < initial_token_a_liquidity ||
-            admin_token_b_data.amount < initial_token_b_liquidity
-        {
+        if admin_token_a_data.amount < token_a_amount || admin_token_b_data.amount < token_b_amount {
             msg!("Error: Insufficient token balance in admin account");
             return Err(AMMError::InsufficientTokenBalance.into());
         }
@@ -147,6 +185,7 @@ impl Processor {
             return Err(AMMError::InvalidMintAccount.into());
         }
 
+        //initializing amm pool account--------------------------------------------------------------------------------------
         //validating amm token account
         let (amm_token_account_pda, amm_token_account_bump) = get_lexicographical_token_pda(
             token_a_mint_account.key,
@@ -171,21 +210,7 @@ impl Processor {
             token_b_pool_account.key
         )?;
 
-        // updating data of amm token account
-        // let amm_token_account_data = AMMAccount::unpack_from_slice(
-        //     &amm_token_account.data.borrow()
-        // )?;
-        let updated_amm_token_account_data = AMMAccount::Initialized {
-            pool_authority: *program_id,
-            token_a_mint: *token_a_mint_account.key,
-            token_b_mint: *token_b_mint_account.key,
-            lp_token_mint: *lp_token_mint_account.key,
-            token_a_pool: *token_a_pool_account.key,
-            token_b_pool: *token_b_pool_account.key,
-            trade_fee: trade_fee,
-        };
-        updated_amm_token_account_data.pack_into_slice(&mut amm_token_account.data.borrow_mut());
-
+        //initializing lp token mint account--------------------------------------------------------------------------------------
         //validating lp token mint account
         let (lp_token_mint_account_pda, lp_token_mint_account_bump) = get_lexicographical_mint_pda(
             b"mint",
@@ -194,7 +219,6 @@ impl Processor {
             token_b_mint_account.key,
             program_id
         );
-        // msg!("aaaaaaaaaaaaaaaaaaa{}",lp_token_mint_account_pda);
         if lp_token_mint_account_pda != *lp_token_mint_account.key {
             msg!(
                 "Error: Invalid LP token mint account provided. {}, {}",
@@ -217,6 +241,7 @@ impl Processor {
             sysvar_rent_account
         )?;
 
+        //INITIALIZING TOKEN POOL ACCOUNTS--------------------------------------------------------------------------------------
         //validating token a pool account
         let (token_a_pool_account_pda, token_a_pool_account_bump) = Pubkey::find_program_address(
             &[b"pool", amm_token_account_pda.as_array(), token_a_mint_account.key.as_array()],
@@ -252,44 +277,47 @@ impl Processor {
             amm_program_account
         )?;
 
+        //Creating NFT accounts--------------------------------------------------------------------------------------
+
+        //Creating Position Account--------------------------------------------------------------------------------------
         //validating admin lp token account
-        let (admin_lp_token_account_pda, admin_lp_token_account_bump) =
-            get_lexicographical_lp_token_pda(
-                admin_account.key,
-                &amm_token_account_pda,
-                token_a_mint_account.key,
-                token_b_mint_account.key,
-                program_id
-            );
+        // let (admin_lp_token_account_pda, admin_lp_token_account_bump) =
+        //     get_lexicographical_lp_token_pda(
+        //         admin_account.key,
+        //         &amm_token_account_pda,
+        //         token_a_mint_account.key,
+        //         token_b_mint_account.key,
+        //         program_id
+        //     );
 
-        if admin_lp_token_account_pda != *admin_lp_token_account.key {
-            msg!("Error: Invalid admin lp token account proviided.");
-            return Err(AMMError::InvalidPDA.into());
-        }
-        //initializing admin lp token account
-        initialize_admin_lp_token_account(
-            admin_account,
-            program_id,
-            &amm_token_account_pda,
-            admin_lp_token_account,
-            spl_token_program_account,
-            system_program_account,
-            lp_token_mint_account,
-            token_a_mint_account,
-            token_b_mint_account,
-            admin_lp_token_account_bump,
-            sysvar_rent_account,
-            amm_program_account
-        )?;
+        // if admin_lp_token_account_pda != *admin_lp_token_account.key {
+        //     msg!("Error: Invalid admin lp token account proviided.");
+        //     return Err(AMMError::InvalidPDA.into());
+        // }
+        // //initializing admin lp token account
+        // initialize_admin_lp_token_account(
+        //     admin_account,
+        //     program_id,
+        //     &amm_token_account_pda,
+        //     admin_lp_token_account,
+        //     spl_token_program_account,
+        //     system_program_account,
+        //     lp_token_mint_account,
+        //     token_a_mint_account,
+        //     token_b_mint_account,
+        //     admin_lp_token_account_bump,
+        //     sysvar_rent_account,
+        //     amm_program_account
+        // )?;
 
-        //collecting token a and token b in pool account
+        //collecting token a and token b in pool account--------------------------------------------------------------------------------------
         let token_a_admin_to_pool_transfer_instruction = spl_token_interface::instruction::transfer(
             spl_token_program_account.key,
             admin_token_a_account.key,
             token_a_pool_account.key,
             admin_account.key,
             &[admin_account.key],
-            initial_token_a_liquidity
+            token_a_amount
         )?;
         msg!("outside  1");
         solana_program::program::invoke(
@@ -307,7 +335,7 @@ impl Processor {
             token_b_pool_account.key,
             admin_account.key,
             &[admin_account.key],
-            initial_token_b_liquidity
+            token_b_amount
         )?;
         msg!("outside  2");
         solana_program::program::invoke(
@@ -319,41 +347,69 @@ impl Processor {
                 admin_account.clone(),
             ]
         )?;
+
+        //calculate the initial price is between start and end tick of the provided range and create start tick and end tick array accounts set the active liquidity accordingly based on the start and end tick
+        let price_a_by_b = (token_a_amount as f64) / (token_b_amount as f64);
+
+        let current_tick = price_to_tick_index(price_a_by_b);
+
+        let active_liquidity = value_to_sqrt_q6464(
+            ((token_a_amount as f64) * (token_b_amount as f64)).sqrt()
+        );
+
+        let q6464_sqrt_price = value_to_sqrt_q6464(price_a_by_b);
+
+        // updating data of amm token account
+        let updated_amm_token_account_data = AMMAccount::Initialized {
+            pool_authority: *program_id,
+            token_a_mint: *token_a_mint_account.key,
+            token_b_mint: *token_b_mint_account.key,
+            lp_token_mint: *lp_token_mint_account.key,
+            token_a_pool: *token_a_pool_account.key,
+            token_b_pool: *token_b_pool_account.key,
+            sqrt_price_a_by_b: q6464_sqrt_price,
+            current_tick,
+            active_liquidity,
+            fee_growth: 0,
+            protocol_fee: 0,
+        };
+        updated_amm_token_account_data.pack_into_slice(&mut amm_token_account.data.borrow_mut());
+
+        //end of calculation 
+
         //calculating the required lp token mint amount
 
-        let lp_token_mint_amount = (
-            (initial_token_a_liquidity as f64) * (initial_token_b_liquidity as f64)
-        )
-            .sqrt()
-            .floor() as u64;
-        //lp token mint in admin lp token account
-        let lp_token_mint_to_admin_instruction = spl_token_interface::instruction::mint_to(
-            spl_token_program_account.key,
-            lp_token_mint_account.key,
-            admin_lp_token_account.key,
-            lp_token_mint_account.key,
-            &[lp_token_mint_account.key],
-            lp_token_mint_amount
-        )?;
-        msg!("outside 3");
-        solana_program::program::invoke_signed(
-            &lp_token_mint_to_admin_instruction,
-            &[
-                spl_token_program_account.clone(),
-                lp_token_mint_account.clone(),
-                admin_lp_token_account.clone(),
-                amm_token_account.clone(),
-            ],
-            &[
-                &[
-                    b"mint",
-                    amm_token_account_pda.as_array(),
-                    token_a_mint_account.key.as_array(),
-                    token_b_mint_account.key.as_array(),
-                    &[lp_token_mint_account_bump],
-                ],
-            ]
-        )?;
+        // let lp_token_mint_amount = ((token_a_amount as f64) * (token_b_amount as f64))
+        //     .sqrt()
+        //     .floor() as u64;
+        // //lp token mint in admin lp token account
+        // let lp_token_mint_to_admin_instruction = spl_token_interface::instruction::mint_to(
+        //     spl_token_program_account.key,
+        //     lp_token_mint_account.key,
+        //     admin_lp_token_account.key,
+        //     lp_token_mint_account.key,
+        //     &[lp_token_mint_account.key],
+        //     lp_token_mint_amount
+        // )?;
+        // msg!("outside 3");
+        // solana_program::program::invoke_signed(
+        //     &lp_token_mint_to_admin_instruction,
+        //     &[
+        //         spl_token_program_account.clone(),
+        //         lp_token_mint_account.clone(),
+        //         admin_lp_token_account.clone(),
+        //         amm_token_account.clone(),
+        //     ],
+        //     &[
+        //         &[
+        //             b"mint",
+        //             amm_token_account_pda.as_array(),
+        //             token_a_mint_account.key.as_array(),
+        //             token_b_mint_account.key.as_array(),
+        //             &[lp_token_mint_account_bump],
+        //         ],
+        //     ]
+        // )?;
         Ok(())
     }
 
@@ -408,7 +464,7 @@ impl Processor {
         let amm_program_account = next_account_info(accounts_iter)?;
 
         //validating amm token account
-        let (amm_token_account_pda, amm_token_account_bump) = get_lexicographical_token_pda(
+        let (amm_token_account_pda, _amm_token_account_bump) = get_lexicographical_token_pda(
             token_a_mint_account.key,
             token_b_mint_account.key,
             program_id
@@ -419,7 +475,7 @@ impl Processor {
         }
 
         //validating token a pool account
-        let (token_a_pool_account_pda, token_a_pool_account_bump) = Pubkey::find_program_address(
+        let (token_a_pool_account_pda, _token_a_pool_account_bump) = Pubkey::find_program_address(
             &[b"pool", amm_token_account_pda.as_array(), token_a_mint_account.key.as_array()],
             program_id
         );
@@ -429,7 +485,7 @@ impl Processor {
         }
 
         //validating token b pool account
-        let (token_b_pool_account_pda, token_b_pool_account_bump) = Pubkey::find_program_address(
+        let (token_b_pool_account_pda, _token_b_pool_account_bump) = Pubkey::find_program_address(
             &[b"pool", amm_token_account_pda.as_array(), token_b_mint_account.key.as_array()],
             program_id
         );
@@ -620,7 +676,7 @@ impl Processor {
         accounts: &[AccountInfo],
         amount_a_min: u64,
         amount_b_min: u64,
-        maximum_lp_tokens: u64
+        _maximum_lp_tokens: u64
     ) -> ProgramResult {
         let accounts_iter = &mut accounts.iter();
 
@@ -651,7 +707,7 @@ impl Processor {
         let lp_token_mint_account = next_account_info(accounts_iter)?;
 
         //10.sysvar_rent_account (readonly)
-        let sysvar_rent_account = next_account_info(accounts_iter)?;
+        let _sysvar_rent_account = next_account_info(accounts_iter)?;
 
         //11. token_a_mint_account(read only)
         let token_a_mint_account = next_account_info(accounts_iter)?;
@@ -660,14 +716,15 @@ impl Processor {
         let token_b_mint_account = next_account_info(accounts_iter)?;
 
         //13. system_program_account(read only)
-        let system_program_account = next_account_info(accounts_iter)?;
+        let _system_program_account = next_account_info(accounts_iter)?;
 
         //14. amm_program_account (read only)
-        let amm_program_account = next_account_info(accounts_iter)?;
+        let _amm_program_account = next_account_info(accounts_iter)?;
 
         //validating amm token account
-        let (amm_token_account_pda, amm_token_account_bump) = get_lexicographical_token_pda(
-            token_a_mint_account.key, token_b_mint_account.key,
+        let (amm_token_account_pda, _amm_token_account_bump) = get_lexicographical_token_pda(
+            token_a_mint_account.key,
+            token_b_mint_account.key,
             program_id
         );
         if amm_token_account_pda != *amm_token_account.key {
@@ -696,11 +753,11 @@ impl Processor {
         }
 
         //validating lp token mint account
-        let (lp_token_mint_account_pda, lp_token_mint_account_bump) = get_lexicographical_mint_pda(
-                b"mint",
-                &amm_token_account_pda,
-                token_a_mint_account.key,
-                token_b_mint_account.key,
+        let (lp_token_mint_account_pda, _lp_token_mint_account_bump) = get_lexicographical_mint_pda(
+            b"mint",
+            &amm_token_account_pda,
+            token_a_mint_account.key,
+            token_b_mint_account.key,
             program_id
         );
 
@@ -729,7 +786,7 @@ impl Processor {
             &amm_token_b_pool_account.data.borrow()
         )?;
 
-        let constant_k = token_a_pool_data.amount * token_b_pool_data.amount;
+        let _constant_k = token_a_pool_data.amount * token_b_pool_data.amount;
 
         let lp_token_mint_data = spl_token_interface::state::Mint::unpack_from_slice(
             &lp_token_mint_account.data.borrow()
@@ -829,13 +886,12 @@ impl Processor {
                 ],
             ]
         )?;
-        let (provider_lp_token_account_pda, provider_lp_token_account_bump) =
+        let (provider_lp_token_account_pda, _provider_lp_token_account_bump) =
             get_lexicographical_lp_token_pda(
-                
-                    liquidity_provider_account.key,
-                    &amm_token_account_pda,
-                    token_a_mint_account.key,
-                    token_b_mint_account.key,
+                liquidity_provider_account.key,
+                &amm_token_account_pda,
+                token_a_mint_account.key,
+                token_b_mint_account.key,
                 program_id
             );
 
@@ -933,10 +989,10 @@ impl Processor {
         let token_b_mint_account = next_account_info(account_iter)?;
 
         //9. system_program_account(read only)
-        let system_program_account = next_account_info(account_iter)?;
+        let _system_program_account = next_account_info(account_iter)?;
 
         //10. amm_program_account (read only)
-        let amm_program_account = next_account_info(account_iter)?;
+        let _amm_program_account = next_account_info(account_iter)?;
         msg!("1");
         if mint_address_in != *token_a_mint_account.key {
             msg!("base mint address doesn't match the provided account");
@@ -947,8 +1003,9 @@ impl Processor {
             return Err(AMMError::InvalidMintAccount.into());
         }
         msg!("1");
-        let (amm_token_account_pda, amm_token_account_bump) = get_lexicographical_token_pda(
-            token_a_mint_account.key, token_b_mint_account.key,
+        let (amm_token_account_pda, _amm_token_account_bump) = get_lexicographical_token_pda(
+            token_a_mint_account.key,
+            token_b_mint_account.key,
             program_id
         );
         if amm_token_account_pda != *amm_token_account.key {
@@ -957,7 +1014,7 @@ impl Processor {
         }
         msg!("1");
         //validating token a pool account
-        let (token_a_pool_account_pda, token_a_pool_account_bump) = Pubkey::find_program_address(
+        let (token_a_pool_account_pda, _token_a_pool_account_bump) = Pubkey::find_program_address(
             &[b"pool", amm_token_account_pda.as_array(), token_a_mint_account.key.as_array()],
             program_id
         );
@@ -1104,8 +1161,11 @@ pub fn initialize_amm_pool_account<'a>(
         lp_token_mint: *program_id,
         token_a_pool: *token_a_pool_account,
         token_b_pool: *token_b_pool_account,
-        trade_fee: 300000,
-        // admin_fee: 0,
+        sqrt_price_a_by_b: 0,
+        current_tick: 0,
+        active_liquidity: 0,
+        fee_growth: 0,
+        protocol_fee: 0,
     };
 
     lp_token_mint_account_data.pack_into_slice(&mut amm_token_account.data.borrow_mut());
@@ -1115,7 +1175,7 @@ pub fn initialize_amm_pool_account<'a>(
 
 pub fn initialize_lp_token_mint_account<'a>(
     admin_account: &AccountInfo<'a>,
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     amm_token_account_pda: &Pubkey,
     lp_token_mint_account: &AccountInfo<'a>,
     system_program_account: &AccountInfo<'a>,
@@ -1182,7 +1242,7 @@ pub fn initialize_lp_token_mint_account<'a>(
 
 pub fn initialize_token_pool_accounts<'a>(
     admin_account: &AccountInfo<'a>,
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     amm_token_account_pda: &Pubkey,
     system_program_account: &AccountInfo<'a>,
     spl_token_program_account: &AccountInfo<'a>,
@@ -1192,7 +1252,7 @@ pub fn initialize_token_pool_accounts<'a>(
     token_b_pool_account: &AccountInfo<'a>,
     token_a_pool_account_bump: u8,
     token_b_pool_account_bump: u8,
-    amm_token_account: &AccountInfo<'a>,
+    _amm_token_account: &AccountInfo<'a>,
     sysvar_rent_account: &AccountInfo<'a>,
     amm_program_account: &AccountInfo<'a>
 ) -> ProgramResult {
@@ -1305,7 +1365,7 @@ pub fn initialize_token_pool_accounts<'a>(
 
 pub fn initialize_admin_lp_token_account<'a>(
     admin_account: &AccountInfo<'a>,
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     amm_token_account_pda: &Pubkey,
     admin_lp_token_account: &AccountInfo<'a>,
     spl_token_program_account: &AccountInfo<'a>,

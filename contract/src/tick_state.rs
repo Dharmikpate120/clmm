@@ -3,44 +3,46 @@ use solana_program::{
     msg,
     program_error::ProgramError,
     program_pack::{IsInitialized, Pack, Sealed},
-    pubkey::Pubkey,
 };
 
+
 #[derive(BorshDeserialize, BorshSerialize)]
-pub enum AMMAccount {
+pub enum TickState {
     Uninitialized,
     Initialized{
-        pool_authority: Pubkey,//32
-        token_a_mint: Pubkey,//32 - 64
-        token_b_mint: Pubkey,//32 - 96
-        lp_token_mint: Pubkey,//32 - 128
-        token_a_pool: Pubkey,//32 - 160
-        token_b_pool: Pubkey,//32 - 192
-        sqrt_price_a_by_b: u128,//16 - 208
-        current_tick: i32,//4 - 212
-        active_liquidity: u128,//16 - 228
-        fee_growth: u128,//16 - 244
-        protocol_fee: u64,//8 - 252
+        net_liquidity: i64,
+        tick_index: u32,
     },
+}
+
+#[derive(BorshDeserialize, BorshSerialize)]
+pub enum TickArray {
+    Uninitialized,
+    Initialized{
+        ticks: Vec<TickState>,
+        start_tick_index: u32,
+        array_index: u32,
+    }
 }
 
 // The `Sealed` trait is a marker trait to prevent
 // other crates from implementing `Pack` for our state.
-impl Sealed for AMMAccount {}
+impl Sealed for TickArray {}
 
-impl IsInitialized for AMMAccount {
+impl IsInitialized for TickArray {
     /// Checks if the account has been initialized.
     fn is_initialized(&self) -> bool {
         match self{
-            AMMAccount::Initialized{  .. } => true,
+            TickArray::Initialized{  .. } => true,
             _ => false,
         }
     }
 }
 
-impl Pack for AMMAccount {
+impl Pack for TickArray {
     /// The length of the account's data in bytes.
-    const LEN: usize = 1 + 252;
+    const LEN: usize = 1 + 32 + 32 + 32 + 32 + 32 + 32 + 8;
+    //  + 8;
 
     /// Deserializes a byte slice into a [StakeAccount].
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
@@ -48,6 +50,10 @@ impl Pack for AMMAccount {
             msg!("Error: Failed to deserialize counter account data");
             ProgramError::InvalidAccountData
         })?;
+        // if !acc.is_initialized{
+        //     msg!("Error: Account is not initialized!");
+        //     return Err(AMMError::AccountNotInitialized.into());
+        // }
         Ok(acc)
     }
 

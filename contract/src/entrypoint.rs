@@ -1,6 +1,6 @@
 use solana_program::{
     entrypoint,
-    account_info::{ AccountInfo, next_account_info },
+    account_info::{ AccountInfo },
     entrypoint::{ ProgramResult },
     pubkey::Pubkey,
 };
@@ -23,8 +23,7 @@ use solana_program::{
 
 //spl token: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
 
-use crate::{ error::AMMError, instruction::AMMInstruction, processor::Processor };
-use solana_program::msg;
+use crate::{ instruction::AMMInstruction, processor::Processor };
 
 entrypoint!(process_instruction);
 
@@ -33,20 +32,20 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8]
 ) -> ProgramResult {
-    msg!("Entrypoint: processing instruction");
-
     match AMMInstruction::unpack(instruction_data)? {
         AMMInstruction::InitializeTokenPool {
-            trade_fee,
-            initial_token_a_liquidity,
-            initial_token_b_liquidity,
+            token_a_amount,
+            token_b_amount,
+            start_tick,
+            end_tick,
         } => {
             Processor::initialize_token_pool_account(
                 program_id,
                 accounts,
-                trade_fee,
-                initial_token_a_liquidity,
-                initial_token_b_liquidity
+                token_a_amount,
+            token_b_amount,
+            start_tick,
+            end_tick
             )
         }
         AMMInstruction::AddLiquidity { amount_a_max, amount_b_max, minimum_lp_tokens } => {

@@ -18,26 +18,19 @@ pub enum AMMInstruction {
     // 11. amm_token_account (writable)
     // 12. sysvar_rent_account : SysvarRent111111111111111111111111111111111 (read only)
     //13. amm_program_account (read only)
+    //14. nft_mint_account (writable)
+    //15. nft_token_account (writable)
+    //16. metaplex_core_program_account(read only)
+    //17. possition_account(writable)
+    //18.first_tick_array_account(writable)
+    //19.last_tick_array_account(writable)
 
-    // Index 0: GK5uAKRv4Abn4szsDuhvcBDoYp8cwAcggkkynMjmSZf3
-    // Index 1: 11111111111111111111111111111111
-    // Index 2: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
-    // Index 3: 6pXNd5iDL3kqz8MxGiqZu4hb9vB9KbrPknGJ5vXfkMgd
-    // Index 4: DB1xwND2situnNxmSCF3XNHnXXayLPoNSHDKJEfNiwpP
-    // Index 5: cfqVCaPpWougv7Kq8kamHk3oZRNYhrTK6QURcACe1xt
-    // Index 6: ADE1HAFKUiNSvWyLUDoQmLsNCqUKm297m6HRfx9GPynn
-    // Index 7: 9NQG7n9W4oKAkYwQqAerpnm9uXd1eN387tTvvcWrFSWb
-    // Index 8: FH9rq1XEwdnxW1SF5qK98n8mAg9M6PgTtzGpiwwjhBN1
-    // Index 9: BngwetXKv5uZVHAdta3SoY2n7BNqdtMPHUH4doiRR6tT
-    // Index 10: AkZGSWn8wZqwPQ5uuaUpvVDBSHf2b7RimiqrFUYWjYRd
-    // Index 11: 8HQanjD9QxL2dDC3aSZMW6VoyeRkZTK43wKpzhEwhExJ
-    // Index 12: SysvarRent111111111111111111111111111111111
-    // Index 13: DzJJz3MQJeqgfGePLndCFG64M8zKJAKaWHYgTzXfuPnZ
     //
     InitializeTokenPool {
-        trade_fee: u64,
-        initial_token_a_liquidity: u64,
-        initial_token_b_liquidity: u64,
+        token_a_amount: u64,
+        token_b_amount: u64,
+        start_tick: u32,
+        end_tick: u32,
     },
 
     //1. liquidity_provider_account(signer, writable)
@@ -101,7 +94,7 @@ pub enum AMMInstruction {
     //3. amm_token_a_pool_account(writable)
     //4. amm_token_b_pool_account(writable)
     //5. swapper_token_a_account(writable)
-    //6. swapper_token_b_account(writable) 
+    //6. swapper_token_b_account(writable)
     //7. token_a_mint_account(read only)
     //8. token_b_mint_account(read only)
     //9. system_program_account(read only)
@@ -110,7 +103,7 @@ pub enum AMMInstruction {
         amount_in: u64,
         minimum_amount_out: u64,
         mint_address_in: Pubkey,
-        mint_address_out: Pubkey
+        mint_address_out: Pubkey,
     },
 
     InitializeTradingAccount,
