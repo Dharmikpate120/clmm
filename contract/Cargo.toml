@@ -21,8 +21,8 @@ bstr = "1.12.1"
 spl-token-interface = "2.0.0"
 # solana-system-program = "3.1.4"
 getrandom = { version = "0.2", features = ["custom"] }
-mpl-core = "0.11.1"
 solana-address = "2.0.0"
+mpl-core = "0.11.1"
 
 [features]
 no-entrypoint =[]

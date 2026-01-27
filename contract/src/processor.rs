@@ -279,6 +279,7 @@ impl Processor {
 
         //Creating NFT accounts--------------------------------------------------------------------------------------
 
+        initialize_nft_accounts(nft_mint_account, admin_account, system_program_account);
         //Creating Position Account--------------------------------------------------------------------------------------
         //validating admin lp token account
         // let (admin_lp_token_account_pda, admin_lp_token_account_bump) =
@@ -375,7 +376,7 @@ impl Processor {
         };
         updated_amm_token_account_data.pack_into_slice(&mut amm_token_account.data.borrow_mut());
 
-        //end of calculation 
+        //end of calculation
 
         //calculating the required lp token mint amount
 
@@ -1494,4 +1495,12 @@ pub fn get_lexicographical_lp_token_pda(
             program_id
         )
     }
+}
+
+pub fn initialize_nft_accounts<'a>(
+    nft_mint_account: &AccountInfo<'a>,
+    admin_account: &AccountInfo<'a>,
+    system_program_account: &AccountInfo<'a>
+) -> ProgramResult {
+    Ok(())
 }
