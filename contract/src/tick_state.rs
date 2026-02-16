@@ -5,14 +5,13 @@ use solana_program::{
     program_pack::{IsInitialized, Pack, Sealed},
 };
 
+use crate::state::TICK_ARRAY_SIZE;
+
 
 #[derive(BorshDeserialize, BorshSerialize)]
-pub enum TickState {
-    Uninitialized,
-    Initialized{
-        net_liquidity: i64,
-        tick_index: u32,
-    },
+pub struct TickState {
+       pub net_liquidity: i64,
+        pub tick_index: u32,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -41,7 +40,7 @@ impl IsInitialized for TickArray {
 
 impl Pack for TickArray {
     /// The length of the account's data in bytes.
-    const LEN: usize = 1 + 32 + 32 + 32 + 32 + 32 + 32 + 8;
+    const LEN: usize = 1 + (4 + (20) * TICK_ARRAY_SIZE as usize) + 4 + 4;
     //  + 8;
 
     /// Deserializes a byte slice into a [StakeAccount].

@@ -5,3 +5,5 @@ pub mod processor;
 pub mod state;
 pub mod tick_state;
 pub mod formulas;
+pub mod bitmap;
+pub mod delta;

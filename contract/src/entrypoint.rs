@@ -48,22 +48,20 @@ pub fn process_instruction(
             end_tick
             )
         }
-        AMMInstruction::AddLiquidity { amount_a_max, amount_b_max, minimum_lp_tokens } => {
+        AMMInstruction::AddLiquidity { liquidity, start_tick, end_tick } => {
             Processor::add_liquidity(
                 program_id,
                 accounts,
-                amount_a_max,
-                amount_b_max,
-                minimum_lp_tokens
+                liquidity,
+                start_tick,
+                end_tick
             )
         }
-        AMMInstruction::WithdrawLiquidity { amount_a_min, amount_b_min, maximum_lp_tokens } => {
+        AMMInstruction::WithdrawLiquidity { minimum_liquidity } => {
             Processor::withdraw_liquidity(
                 program_id,
                 accounts,
-                amount_a_min,
-                amount_b_min,
-                maximum_lp_tokens
+                minimum_liquidity
             )
         }
         AMMInstruction::Swap {

@@ -51,6 +51,18 @@ pub enum AMMError {
     InsufficientLpTokensAvailable,
     
     #[error("Price exceeds the privided Max price")]
-    PriceTooHigh
+    PriceTooHigh,
+
+    #[error("Invalid Position Account Provided!")]
+    InvalidPositionAccount,
+
+    #[error("Initial price is not in between the provided tick range.")]
+    InitialPriceOutOfRange,
+
+    #[error("Invalid Bitmap Array Provided.")]
+    InvalidBitmapArray,
+
+    #[error("Invalid Tick array provided!")]
+    InvalidTickArray
 }
 

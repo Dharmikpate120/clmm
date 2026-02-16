@@ -1,6 +1,6 @@
 cargo-features = ["edition2024"]
 [package]
-name = "solana_stake"
+name = "concentrated_liquidity_market_maker"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,7 +8,6 @@ edition = "2021"
 crate-type = ["cdylib","lib"]
 
 [dependencies]
-solana-program = "3.0.0"
 borsh = "1.5.7"
 thiserror = "2.0.17"
 num-derive = "0.4.2"
@@ -21,8 +20,15 @@ bstr = "1.12.1"
 spl-token-interface = "2.0.0"
 # solana-system-program = "3.1.4"
 getrandom = { version = "0.2", features = ["custom"] }
-solana-address = "2.0.0"
+solana-program = "3.0.0"
 mpl-core = "0.11.1"
+solana-address = "2.0.0"
+# solana-address = "2.0.0"
 
 [features]
 no-entrypoint =[]
+
+# [patch.crates-io]
+# Pin constant_time_eq to a version that doesn't use Edition 2024
+# constant_time_eq = "=0.3.1"
+
