@@ -1,12 +1,11 @@
 'use client'
+
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
-import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Menu, X } from 'lucide-react'
-import { ThemeSelect } from '@/components/theme-select'
+import dynamic from 'next/dynamic'
 import { WalletDropdown } from '@/components/wallet-dropdown'
+import { ThemeSelect } from '@/components/theme-select'
+import SettingsIcon from "@mui/icons-material/Settings";
 
 const ClusterDropdown = dynamic(() => import('@/components/cluster-dropdown').then((m) => m.ClusterDropdown), {
   ssr: false,
@@ -14,70 +13,53 @@ const ClusterDropdown = dynamic(() => import('@/components/cluster-dropdown').th
 
 export function AppHeader({ links = [] }: { links: { label: string; path: string }[] }) {
   const pathname = usePathname()
-  const [showMenu, setShowMenu] = useState(false)
 
-  function isActive(path: string) {
-    return path === '/' ? pathname === '/' : pathname.startsWith(path)
-  }
+  const isActive = (path: string) => {
+    return pathname === path ? "text-primary bg-primary/10 dark:text-secondary dark:bg-secondary/10" : "text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-secondary";
+  };
 
   return (
-    <header className="relative z-50 px-4 py-2 bg-card/50">
-      <div className="mx-auto flex justify-between items-center">
-        <div className="flex items-baseline gap-4">
-          <Link className="text-xl hover:text-neutral-500 dark:hover:text-white" href="/">
-            <span>Cpmm</span>
-          </Link>
-          <div className="hidden md:flex items-center">
-            <ul className="flex gap-4 flex-nowrap items-center">
-              {links.map(({ label, path }) => (
-                <li key={path}>
+    <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          <div className="flex items-center gap-8">
+            <Link href="/" className="flex-shrink-0 flex items-center gap-2 cursor-pointer">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-secondary to-primary flex items-center justify-center text-white font-bold">
+                S
+              </div>
+              <span className="font-bold text-lg tracking-tight dark:text-white">SolFluence</span>
+            </Link>
+            <div className="hidden md:block">
+              <div className="flex items-baseline space-x-4">
+                {links.map(({ label, path }) => (
                   <Link
-                    className={`hover:text-neutral-500 dark:hover:text-white ${isActive(path) ? 'text-neutral-500 dark:text-white' : ''}`}
+                    key={path}
                     href={path}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive(path)}`}
                   >
                     {label}
                   </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
-        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setShowMenu(!showMenu)}>
-          {showMenu ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </Button>
-
-        <div className="hidden md:flex items-center gap-4">
-          <WalletDropdown />
-          <ClusterDropdown />
-          <ThemeSelect />
-        </div>
-
-        {showMenu && (
-          <div className="md:hidden fixed inset-x-0 top-[52px] bottom-0 bg-neutral-100/95 dark:bg-neutral-900/95 backdrop-blur-sm">
-            <div className="flex flex-col p-4 gap-4 border-t dark:border-neutral-800">
-              <div className="flex justify-end items-center gap-4">
-                <WalletDropdown />
-                <ClusterDropdown />
-                <ThemeSelect />
-              </div>
-              <ul className="flex flex-col gap-4">
-                {links.map(({ label, path }) => (
-                  <li key={path}>
-                    <Link
-                      className={`block text-lg py-2  ${isActive(path) ? 'text-foreground' : 'text-muted-foreground'} hover:text-foreground`}
-                      href={path}
-                      onClick={() => setShowMenu(false)}
-                    >
-                      {label}
-                    </Link>
-                  </li>
                 ))}
-              </ul>
+              </div>
             </div>
           </div>
-        )}
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-2">
+              <ClusterDropdown />
+            </div>
+
+            <WalletDropdown />
+
+            <div className="hidden md:block">
+              <ThemeSelect />
+            </div>
+            <button className="md:hidden p-2 rounded-full text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer">
+              {/* Mobile Menu Placeholder - Design didn't specify mobile menu behavior clearly, keeping simple for now */}
+              <SettingsIcon fontSize="small" />
+            </button>
+          </div>
+        </div>
       </div>
-    </header>
+    </nav>
   )
 }

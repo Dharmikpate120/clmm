@@ -1,8 +1,7 @@
-use std::{ slice::Iter, thread::current };
+use std::{ slice::Iter };
 
 use crate::{
     bitmap::{
-        self,
         bitmaphelper::{
             activate_bit,
             check_bit_status_u8,
@@ -25,13 +24,11 @@ use crate::{
     state::{ AMMAccount, PositionAccount, TICK_ARRAY_SIZE },
     tick_state::{ TickArray, TickState },
 };
-use num_traits::Float;
 // use mpl_core::types::DataState;
 use solana_program::{
     account_info::{ AccountInfo, next_account_info },
     entrypoint::ProgramResult,
-    example_mocks::{ solana_account::Account, solana_sdk::system_program },
-    instruction::{ AccountMeta, Instruction },
+    instruction::{ AccountMeta },
     msg,
     program::invoke,
     program_pack::IsInitialized,
