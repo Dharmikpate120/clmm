@@ -46,7 +46,8 @@ impl Pack for AMMAccount {
 
     /// Deserializes a byte slice into a [StakeAccount].
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
-        let acc = Self::try_from_slice(src).map_err(|_| {
+        let mut mut_src = src;
+        let acc = Self::deserialize(&mut mut_src).map_err(|_| {
             msg!("Error: Failed to deserialize counter account data");
             ProgramError::InvalidAccountData
         })?;
@@ -85,11 +86,12 @@ impl IsInitialized for PositionAccount {
 
 impl Pack for PositionAccount {
     /// The length of the account's data in bytes.
-    const LEN: usize = 1 + 32;
+    const LEN: usize =1 + 24;
 
     /// Deserializes a byte slice into a [StakeAccount].
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
-        let acc = Self::try_from_slice(src).map_err(|_| {
+        let mut mut_src = src;
+        let acc = Self::deserialize(&mut mut_src).map_err(|_| {
             msg!("Error: Failed to deserialize counter account data");
             ProgramError::InvalidAccountData
         })?;

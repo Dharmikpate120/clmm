@@ -201,7 +201,7 @@ impl Processor {
             msg!("Error: Admin token B account mint does not match provided token B mint account");
             return Err(AMMError::InvalidMintAccount.into());
         }
-        msg!("1");
+        msg!("2");
         //initializing amm pool account--------------------------------------------------------------------------------------
         //validating amm token account
         let (amm_token_account_pda, amm_token_account_bump) = get_lexicographical_token_pda(
@@ -213,7 +213,7 @@ impl Processor {
             msg!("Error: Invalid AMM token account provided.");
             return Err(AMMError::InvalidAMMTokenAccount.into());
         }
-        msg!("1");
+        msg!("3");
         //creating and initializing amm pool account
         initialize_amm_pool_account(
             admin_account,
@@ -228,15 +228,14 @@ impl Processor {
             token_b_pool_account.key
         )?;
         //INITIALIZE BITMAP ARRAY ACCOUNTS
-        let start_bitmap_index = start_tick / 80000;
-        let end_bitmap_index = end_tick / 80000;
-        msg!("1");
+        let start_bitmap_index = start_tick / 10000;
+        let end_bitmap_index = end_tick / 10000;
+        msg!("4");
         if start_bitmap_index == end_bitmap_index {
             let (start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
                 &[b"bitmap", &start_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
                 amm_program_account.key
             );
-            msg!("{:?}", start_bitmap_address);
             initialize_bitmap_account(
                 start_bitmap_account,
                 start_bitmap_account_bump,
@@ -278,7 +277,7 @@ impl Processor {
             activate_bit(&mut start_bitmap_account.data.borrow_mut(), start_tick as u64);
             activate_bit(&mut end_bitmap_account.data.borrow_mut(), end_tick as u64);
         }
-        msg!("1");
+        msg!("5");
         //INITIALIZING TOKEN POOL ACCOUNTS--------------------------------------------------------------------------------------
         //validating token a pool account
         let (token_a_pool_account_pda, token_a_pool_account_bump) = Pubkey::find_program_address(
@@ -314,7 +313,7 @@ impl Processor {
             sysvar_rent_account,
             amm_program_account
         )?;
-        msg!("1");
+        msg!("6");
         //Creating NFT accounts--------------------------------------------------------------------------------------
 
         initialize_nft_accounts(
@@ -327,7 +326,7 @@ impl Processor {
         //move this below the calculation to directly set the state asdfghjkl;
         //Creating Position Account--------------------------------------------------------------------------------------
         let mut pa_seeds: Vec<&[u8]> = vec![nft_mint_account.key.as_array()];
-        msg!("1");
+        msg!("7");
         let (position_account_pda, position_account_bump) = Pubkey::find_program_address(
             get_lexicographical_tokens_addresses(
                 token_a_mint_account.key,
@@ -359,7 +358,7 @@ impl Processor {
                 admin_account.clone(),
             ]
         )?;
-        msg!("1");
+        msg!("8");
         let token_b_admin_to_pool_transfer_instruction = spl_token_interface::instruction::transfer(
             spl_token_program_account.key,
             admin_token_b_account.key,
@@ -377,12 +376,12 @@ impl Processor {
                 admin_account.clone(),
             ]
         )?;
-        msg!("1");
+        msg!("9");
         //calculate the initial price is between start and end tick of the provided range and create start tick and end tick array accounts set the active liquidity accordingly based on the start and end tick
         let price_a_by_b = (token_a_amount as f64) / (token_b_amount as f64);
 
         let current_tick = price_to_tick_index(price_a_by_b);
-
+        msg!("{}", current_tick);
         if current_tick < (start_tick as u32) || current_tick > (end_tick as u32) {
             msg!("Error : Initial price is not in between the provided tick range.");
             return Err(AMMError::InitialPriceOutOfRange.into());
@@ -404,7 +403,7 @@ impl Processor {
             end_tick,
             active_liquidity
         )?;
-
+msg!("2");
         initialize_tick_array_accounts(
             first_tick_array_account,
             last_tick_array_account,
@@ -418,7 +417,8 @@ impl Processor {
         )?;
 
         let q6464_sqrt_price = value_to_sqrt_q6464(price_a_by_b);
-        msg!("1");
+        msg!("3");
+        msg!("{:?}", amm_token_account.owner);
         // updating data of amm token account
         let updated_amm_token_account_data = AMMAccount::Initialized {
             pool_authority: *program_id,
@@ -537,8 +537,8 @@ impl Processor {
         }
 
         //INITIALIZE BITMAP ARRAY ACCOUNTS
-        let start_bitmap_index = start_tick / 80000;
-        let end_bitmap_index = end_tick / 80000;
+        let start_bitmap_index = start_tick / 10000;
+        let end_bitmap_index = end_tick / 10000;
 
         if start_bitmap_index == end_bitmap_index {
             let (_start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
@@ -970,8 +970,8 @@ impl Processor {
         };
 
         //INITIALIZE BITMAP ARRAY ACCOUNTS
-        let start_bitmap_index = start_tick / 80000;
-        let end_bitmap_index = end_tick / 80000;
+        let start_bitmap_index = start_tick / 10000;
+        let end_bitmap_index = end_tick / 10000;
 
         //updating ticks
         for tick in start_account_ticks.iter_mut() {
@@ -1226,7 +1226,7 @@ impl Processor {
                     for x in 0..8 {
                         if check_bit_status_u8(i, x) == 1 && !quit {
                             //calculate the tick_index and tick_price for the active tick
-                            let tick_index = index * 80000 + (id as u32) * 8 + (x as u32);
+                            let tick_index = index * 10000 + (id as u32) * 8 + (x as u32);
                             let mut tick_price = tick_index_to_price(tick_index);
 
                             //calculate the price with remaining tokens with current liquidity
@@ -1292,7 +1292,7 @@ impl Processor {
                 for x in (0..8).rev() {
                     if check_bit_status_u8(i, x) == 1 && !quit {
                         //calculate the tick_index and tick_price for the active tick
-                        let tick_index = index * 80000 + (id as u32) * 8 + (x as u32);
+                        let tick_index = index * 10000 + (id as u32) * 8 + (x as u32);
                         let mut tick_price = tick_index_to_price(tick_index);
 
                         //calculate the price with remaining tokens with current liquidity
@@ -1427,7 +1427,7 @@ pub fn initialize_amm_pool_account<'a>(
                 amm_token_account.key,
                 Rent::get()?.minimum_balance(AMMAccount::LEN),
                 AMMAccount::LEN as u64,
-                amm_token_account.key
+                program_id
             );
         solana_program::program::invoke_signed(
             &lp_token_mint_account_create_instruction,
@@ -1810,12 +1810,11 @@ pub enum DataState {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
-pub struct CreateV2InstructionArgs {
+pub struct CreateV1InstructionArgs {
     pub data_state: DataState,
     pub name: String,
     pub uri: String,
-    pub plugins: Option<String>,
-    pub external_plugin_adapters: Option<String>,
+    pub plugins: Option<String>
 }
 pub fn initialize_nft_accounts<'a>(
     nft_mint_account: &AccountInfo<'a>,
@@ -1823,6 +1822,25 @@ pub fn initialize_nft_accounts<'a>(
     system_program_account: &AccountInfo<'a>,
     metaplex_core_program_account: &AccountInfo<'a>
 ) -> ProgramResult {
+
+    // if nft_mint_account.data_is_empty(){
+    //     let nft_mint_account_create_instruction =
+    //     solana_system_interface::instruction::create_account(
+    //         admin_account.key,
+    //         nft_mint_account.key,
+    //         Rent::get()?.minimum_balance(43),
+    //         43 as u64,
+    //         admin_account.key
+    //     );
+        
+    //     solana_program::program::invoke(
+    //         &nft_mint_account_create_instruction,
+    //         &[system_program_account.clone(), admin_account.clone(), nft_mint_account.clone()]
+    //     )?;
+    //     msg!("created account");
+    // }
+    msg!("mpl core program id: {:?}", nft_mint_account.data);
+
     let accounts: Vec<AccountMeta> = vec![
         //      /// The address of the new asset
         // pub asset: solana_program::pubkey::Pubkey,
@@ -1900,15 +1918,15 @@ pub fn initialize_nft_accounts<'a>(
         }
     ];
 
-    let data = CreateV2InstructionArgs {
+    let data = CreateV1InstructionArgs {
         data_state: DataState::AccountState,
         name: "clmm_liquidity_account".to_string(),
         uri: "".to_string(),
         plugins: None,
-        external_plugin_adapters: None,
     };
-    let mut serialized_data = vec![];
+    let mut serialized_data = vec![0];
     data.serialize(&mut serialized_data).expect("cannot serialize metaplex data!");
+    msg!("{:?}", serialized_data);
 
     let instruction = solana_program::instruction::Instruction {
         program_id: solana_address::Address::from_str_const(
@@ -1970,9 +1988,11 @@ pub fn initialize_position_account<'a>(
             ]
         )?;
     }
-    let position_account_data = PositionAccount::try_from_slice(
+    msg!("position account data: {:?}",position_account.data.borrow().len());
+    let position_account_data = PositionAccount::unpack_from_slice(
         position_account.data.borrow().as_ref()
     )?;
+    msg!("deserialized!");
     match position_account_data {
         PositionAccount::Uninitialized => {
             let position_account_initialize_data = PositionAccount::Initialized {
@@ -2015,6 +2035,7 @@ pub fn initialize_tick_array_accounts<'a>(
         amm_program_account.key
     );
 
+    msg!("{}, {}, {}", last_tick_array_index, last_tick_array_pda, last_tick_array_account.key);
     //validating first tick array account
     if first_tick_array_pda != *first_tick_array_account.key {
         msg!("Error: Invalid first tick array account provided.");

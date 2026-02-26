@@ -26,9 +26,9 @@ export default function SubHeader() {
     admin_token_a_account: 'cfqVCaPpWougv7Kq8kamHk3oZRNYhrTK6QURcACe1xt',
     admin_token_b_account: 'ADE1HAFKUiNSvWyLUDoQmLsNCqUKm297m6HRfx9GPynn',
     token_a_amount: '100',
-    token_b_amount: '100',
+    token_b_amount: '10',
     start_tick: '22000',
-    end_tick: '24000',
+    end_tick: '34000',
     admin_account: 'GK5uAKRv4Abn4szsDuhvcBDoYp8cwAcggkkynMjmSZf3',
   })
 
@@ -38,6 +38,15 @@ export default function SubHeader() {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
+
+//     #[account(0, writable, signer, name="asset", desc = "The address of the new asset")]
+//     #[account(1, optional, writable, name="collection", desc = "The collection to which the asset belongs")]
+//     #[account(2, optional, signer, name="authority", desc = "The authority signing for creation")]
+//     #[account(3, writable, signer, name="payer", desc = "The account paying for the storage fees")]
+//     #[account(4, optional, name="owner", desc = "The owner of the new asset. Defaults to the authority if not present.")]
+//     #[account(5, optional, name="update_authority", desc = "The authority on the new asset")]
+//     #[account(6, name="system_program", desc = "The system program")]
+//     #[account(7, optional, name="log_wrapper", desc = "The SPL Noop Program")]
 
   const handleCreatePool = async () => {
     // Handler function to process the form data
@@ -55,9 +64,9 @@ export default function SubHeader() {
       admin_token_a_account: 'cfqVCaPpWougv7Kq8kamHk3oZRNYhrTK6QURcACe1xt',
       admin_token_b_account: 'ADE1HAFKUiNSvWyLUDoQmLsNCqUKm297m6HRfx9GPynn',
       token_a_amount: '100',
-      token_b_amount: '100',
+      token_b_amount: '10',
       start_tick: '22000',
-      end_tick: '24000',
+      end_tick: '34000',
       admin_account: 'GK5uAKRv4Abn4szsDuhvcBDoYp8cwAcggkkynMjmSZf3',
     })
   }

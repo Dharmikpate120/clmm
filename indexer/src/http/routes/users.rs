@@ -194,7 +194,7 @@ pub fn router() -> Router {
 //                 "Program log: Instruction: Payout",
 //                 "Program data: eqL7NlT+AzAB8bsAAAAAAACLRzsfoLARrYSZBeffLZY2bwqlFGmFycLuVu4v0H1pkRGArVhUghA/1tXW/79GcBJFwtnt682P/B/rNJOR4G3KPrUAAAAAAAAA",
 //                 "Program data: a1RmNNOEMo0B8bsAAAAAAABPmQ+bpUfkej/C4ATuK3lNgWNJbHwsHcu5+RCKj8Ng5YtHOx+gsBGthJkF598tljZvCqUUaYXJwu5W7i/QfWmRVvZdAAAAAAAA",
-//                 "Program CRAS82V4t9AsALmndi9YcKVFx6eVNTefHvNFCVdp4LW2 consumed 21759 of 800000 compute units",
+//                 "Program CRAS82V4t9AsALmndi9YcKVFx6eVNTefHvNFCVdp4LW2 consumed 21759 of 100000 compute units",
 //                 "Program CRAS82V4t9AsALmndi9YcKVFx6eVNTefHvNFCVdp4LW2 success",
 //                 "Program CRAS82V4t9AsALmndi9YcKVFx6eVNTefHvNFCVdp4LW2 invoke [1]",
 //                 "Program log: Instruction: Payout",

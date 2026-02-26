@@ -18,7 +18,7 @@ pub struct Bitmap {
 impl Sealed for Bitmap {}
 
 impl Pack for Bitmap {
-    const LEN: usize = 80000;
+    const LEN: usize = 10000;
 
     fn pack_into_slice(&self, dst: &mut [u8]) {
         self.serialize(&mut &mut dst[..]).expect("Failed to serialize counter account");

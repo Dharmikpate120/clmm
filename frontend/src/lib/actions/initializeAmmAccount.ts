@@ -267,7 +267,7 @@ async function AmmaccountsCreator(data: AmmAccountData): Promise<(AccountMeta | 
 
   //13. metaplex_core_program_account(read only)
   accounts.push({
-    address: address('C9PLf3qMCVqtUCJtEBy8NCcseNp3KTZwFJxAtDdN1bto'),
+    address: address('CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d'),
     role: AccountRole.READONLY,
   })
 
@@ -292,14 +292,15 @@ async function AmmaccountsCreator(data: AmmAccountData): Promise<(AccountMeta | 
     programAddress: address(process.env.AMM_PROGRAM_ADDRESS!),
     seeds: [startTickBuffer, addressEncoder.encode(amm_token_account_address)],
   })
-
+  console.log(`start tick index ${Math.floor(Number(data.start_tick) / 88)}, ${Math.floor(Number(data.end_tick) / 88)}`)
   accounts.push({
     address: first_tick_array_account,
     role: AccountRole.WRITABLE,
   })
+
   //16.last_tick_array_account(writable)
   const lastTickBuffer = Buffer.alloc(4)
-  startTickBuffer.writeUInt32BE(Math.floor(Number(data.start_tick) / 88), 0)
+  lastTickBuffer.writeUInt32BE(Math.floor(Number(data.end_tick) / 88), 0)
 
   const [last_tick_array_account] = await getProgramDerivedAddress({
     programAddress: address(process.env.AMM_PROGRAM_ADDRESS!),
@@ -312,7 +313,7 @@ async function AmmaccountsCreator(data: AmmAccountData): Promise<(AccountMeta | 
   })
 
   //17. start_bitmap_account(writable)
-  const start_bitmap_index = Math.floor(parseInt(data.start_tick) / 80000)
+  const start_bitmap_index = Math.floor(parseInt(data.start_tick) / 10000)
   const start_bitmap_index_buffer = Buffer.alloc(4)
   start_bitmap_index_buffer.writeUInt32BE(start_bitmap_index)
   const [start_bitmap_address] = await getProgramDerivedAddress({
@@ -327,7 +328,7 @@ async function AmmaccountsCreator(data: AmmAccountData): Promise<(AccountMeta | 
   })
 
   //18. end_bitmap_account(writable)
-  const end_bitmap_index = Math.floor(parseInt(data.end_tick) / 80000)
+  const end_bitmap_index = Math.floor(parseInt(data.end_tick) / 10000)
   const end_bitmap_index_buffer = Buffer.alloc(4)
   end_bitmap_index_buffer.writeUInt32BE(end_bitmap_index)
 

@@ -1,7 +1,7 @@
 use solana_program::msg;
 
 pub fn check_bit_status(bitarray: &[u8], tick: u64) -> u8 {
-    let trail = tick % 80000;
+    let trail = tick % 10000;
     let index = trail / 8;
     let position = 7 - (trail % 8);
     let bits = bitarray[index as usize];
@@ -16,7 +16,7 @@ pub fn check_bit_status_u8(bits: &u8, index: u8) -> u8 {
 pub fn activate_bit(bitarray: &mut [u8], tick: u64) -> &mut [u8] {
     let status = check_bit_status(bitarray, tick);
     if status == 0 {
-        let trail = tick % 80000;
+        let trail = tick % 10000;
         let index = trail / 8;
         let position = 7 - (trail % 8);
         let bits = &mut bitarray[index as usize];
@@ -29,7 +29,7 @@ pub fn activate_bit(bitarray: &mut [u8], tick: u64) -> &mut [u8] {
 pub fn deactivate_bit(bitarray: &mut [u8], tick: u64) -> &mut [u8] {
     let status = check_bit_status(bitarray, tick);
     if status == 1 {
-        let trail = tick % 80000;
+        let trail = tick % 10000;
         let index = trail / 8;
         let position = 7 - (trail % 8);
         let bits = &mut bitarray[index as usize];
@@ -39,10 +39,10 @@ pub fn deactivate_bit(bitarray: &mut [u8], tick: u64) -> &mut [u8] {
     bitarray
 }
 pub fn get_bitarray_index(tick:u32) -> u32 {
-    tick / 80000
+    tick / 10000
 }
 pub fn get_tail(tick: u32) -> u32 {
-    tick % 80000
+    tick % 10000
 }
 #[cfg(test)]
 mod tests {
