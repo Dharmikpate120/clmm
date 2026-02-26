@@ -56,8 +56,8 @@ impl Processor {
         // 0. admin account (signer, writable)
         let admin_account = next_account_info(account_iter)?;
 
-        // 1. system program account: 11111111111111111111111111111111 (read only)
-        let system_program_account = next_account_info(account_iter)?;
+        // 1. nft_mint_account (signer, writable)
+        let nft_mint_account = next_account_info(account_iter)?;
 
         // 2. spl token program account: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA (read only)
         let spl_token_program_account = next_account_info(account_iter)?;
@@ -74,46 +74,41 @@ impl Processor {
         // 6. admin token B account (writable)
         let admin_token_b_account = next_account_info(account_iter)?;
 
-        // 7. admin lp token account (writable)
-        let admin_lp_token_account = next_account_info(account_iter)?;
-
-        // 8. token A pool account (writable)
+        // 7. token A pool account (writable)
         let token_a_pool_account = next_account_info(account_iter)?;
 
-        // 9. token B pool account (writable)
+        // 8. token B pool account (writable)
         let token_b_pool_account = next_account_info(account_iter)?;
 
-        // 10. amm_token_account (writable)
+        // 9. amm_token_account (writable)
         let amm_token_account = next_account_info(account_iter)?;
 
-        // 11. sysvar_rent_account : SysvarRent111111111111111111111111111111111 (read only)
+        // 10. sysvar_rent_account : SysvarRent111111111111111111111111111111111 (read only)
         let sysvar_rent_account = next_account_info(account_iter)?;
 
-        //12. amm_program_account (read only)
+        //11. amm_program_account (read only)
         let amm_program_account = next_account_info(account_iter)?;
 
-        //13. nft_mint_account (writable)
-        let nft_mint_account = next_account_info(account_iter)?;
+        //12. system program account: 11111111111111111111111111111111 (read only)
+        let system_program_account = next_account_info(account_iter)?;
 
-        //14. nft_token_account (writable)
-        let nft_token_account = next_account_info(account_iter)?;
-
-        //15. metaplex_core_program_account(read only)
+        //13. metaplex_core_program_account(read only)
         let metaplex_core_program_account = next_account_info(account_iter)?;
 
-        //16. position_account(writable)
+        //14. position_account(writable)
         let position_account = next_account_info(account_iter)?;
 
-        //17.first_tick_array_account(writable)
+        //15.first_tick_array_account(writable)
         let first_tick_array_account = next_account_info(account_iter)?;
 
-        //18.last_tick_array_account
+        //16.last_tick_array_account
         let last_tick_array_account = next_account_info(account_iter)?;
 
-        //19. start_bitmap_account
+        //17. start_bitmap_account
         let start_bitmap_account = next_account_info(account_iter)?;
-        //20. end_bitmap_account
+        //18. end_bitmap_account
         let end_bitmap_account = next_account_info(account_iter)?;
+
         //verifying accounts access--------------------------------------------------------------------------------------
         if admin_account.is_signer == false {
             msg!("Error: Admin account is not a signer");
@@ -121,7 +116,10 @@ impl Processor {
         }
 
         if *system_program_account.key != solana_system_interface::program::ID {
-            msg!("Error: System program account is invalid");
+            msg!(
+                "Error: System program account is invalid: {:?}",
+                solana_system_interface::program::ID
+            );
             return Err(AMMError::InvalidSystemProgram.into());
         }
 
@@ -137,10 +135,7 @@ impl Processor {
             msg!("Error: Admin token A account is not writable");
             return Err(AMMError::NotWritable.into());
         }
-        if admin_lp_token_account.is_writable == false {
-            msg!("Error: Admin LP token account is not writable");
-            return Err(AMMError::NotWritable.into());
-        }
+
         if token_a_pool_account.is_writable == false || token_b_pool_account.is_writable == false {
             msg!("Error: Token pool accounts are not writable!");
             return Err(AMMError::NotWritable.into());
@@ -150,8 +145,8 @@ impl Processor {
             return Err(AMMError::NotWritable.into());
         }
 
-        if nft_mint_account.is_writable == false || nft_token_account.is_writable == false {
-            msg!("Error: nft token | mint account is not writable");
+        if nft_mint_account.is_writable == false {
+            msg!("Error: nft mint account is not writable");
             return Err(AMMError::NotWritable.into());
         }
 
@@ -168,7 +163,7 @@ impl Processor {
         }
 
         //verifying accounts data--------------------------------------------------------------------------------------
-
+        msg!("1");
         let admin_token_a_data = spl_token_interface::state::Account::unpack_from_slice(
             admin_token_a_account.data.borrow().as_ref()
         )?;
@@ -206,7 +201,7 @@ impl Processor {
             msg!("Error: Admin token B account mint does not match provided token B mint account");
             return Err(AMMError::InvalidMintAccount.into());
         }
-
+        msg!("1");
         //initializing amm pool account--------------------------------------------------------------------------------------
         //validating amm token account
         let (amm_token_account_pda, amm_token_account_bump) = get_lexicographical_token_pda(
@@ -218,6 +213,7 @@ impl Processor {
             msg!("Error: Invalid AMM token account provided.");
             return Err(AMMError::InvalidAMMTokenAccount.into());
         }
+        msg!("1");
         //creating and initializing amm pool account
         initialize_amm_pool_account(
             admin_account,
@@ -234,12 +230,13 @@ impl Processor {
         //INITIALIZE BITMAP ARRAY ACCOUNTS
         let start_bitmap_index = start_tick / 80000;
         let end_bitmap_index = end_tick / 80000;
-
+        msg!("1");
         if start_bitmap_index == end_bitmap_index {
             let (start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
-                &[format!("{}", start_bitmap_index).as_bytes(), amm_token_account_pda.as_array()],
+                &[b"bitmap", &start_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
                 amm_program_account.key
             );
+            msg!("{:?}", start_bitmap_address);
             initialize_bitmap_account(
                 start_bitmap_account,
                 start_bitmap_account_bump,
@@ -247,15 +244,17 @@ impl Processor {
                 system_program_account,
                 amm_program_account,
                 &amm_token_account_pda,
-                start_bitmap_index as u64
+                start_bitmap_index,
+                program_id
             )?;
         } else {
+            msg!("3");
             let (_start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
-                &[format!("{}", start_bitmap_index).as_bytes(), amm_token_account_pda.as_array()],
+                &[b"bitmap", &start_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
                 amm_program_account.key
             );
             let (_end_bitmap_address, end_bitmap_account_bump) = Pubkey::find_program_address(
-                &[format!("{}", end_bitmap_index).as_bytes(), amm_token_account_pda.as_array()],
+                &[b"bitmap", &end_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
                 amm_program_account.key
             );
             initialize_bitmap_account(
@@ -265,7 +264,7 @@ impl Processor {
                 system_program_account,
                 amm_program_account,
                 &amm_token_account_pda,
-                start_bitmap_index as u64
+                start_bitmap_index,program_id
             )?;
             initialize_bitmap_account(
                 end_bitmap_account,
@@ -274,12 +273,12 @@ impl Processor {
                 system_program_account,
                 amm_program_account,
                 &amm_token_account_pda,
-                end_bitmap_index as u64
+                end_bitmap_index,program_id
             )?;
             activate_bit(&mut start_bitmap_account.data.borrow_mut(), start_tick as u64);
             activate_bit(&mut end_bitmap_account.data.borrow_mut(), end_tick as u64);
         }
-
+        msg!("1");
         //INITIALIZING TOKEN POOL ACCOUNTS--------------------------------------------------------------------------------------
         //validating token a pool account
         let (token_a_pool_account_pda, token_a_pool_account_bump) = Pubkey::find_program_address(
@@ -315,7 +314,7 @@ impl Processor {
             sysvar_rent_account,
             amm_program_account
         )?;
-
+        msg!("1");
         //Creating NFT accounts--------------------------------------------------------------------------------------
 
         initialize_nft_accounts(
@@ -327,12 +326,14 @@ impl Processor {
 
         //move this below the calculation to directly set the state asdfghjkl;
         //Creating Position Account--------------------------------------------------------------------------------------
+        let mut pa_seeds: Vec<&[u8]> = vec![nft_mint_account.key.as_array()];
+        msg!("1");
         let (position_account_pda, position_account_bump) = Pubkey::find_program_address(
-            &[
-                nft_mint_account.key.as_array(),
-                token_a_mint_account.key.as_array(),
-                token_b_mint_account.key.as_array(),
-            ],
+            get_lexicographical_tokens_addresses(
+                token_a_mint_account.key,
+                token_b_mint_account.key,
+                &mut pa_seeds
+            ),
             amm_program_account.key
         );
         if position_account_pda != *position_account.key {
@@ -349,7 +350,6 @@ impl Processor {
             &[admin_account.key],
             token_a_amount
         )?;
-        msg!("outside  1");
         solana_program::program::invoke(
             &token_a_admin_to_pool_transfer_instruction,
             &[
@@ -359,6 +359,7 @@ impl Processor {
                 admin_account.clone(),
             ]
         )?;
+        msg!("1");
         let token_b_admin_to_pool_transfer_instruction = spl_token_interface::instruction::transfer(
             spl_token_program_account.key,
             admin_token_b_account.key,
@@ -367,7 +368,6 @@ impl Processor {
             &[admin_account.key],
             token_b_amount
         )?;
-        msg!("outside  2");
         solana_program::program::invoke(
             &token_b_admin_to_pool_transfer_instruction,
             &[
@@ -377,7 +377,7 @@ impl Processor {
                 admin_account.clone(),
             ]
         )?;
-
+        msg!("1");
         //calculate the initial price is between start and end tick of the provided range and create start tick and end tick array accounts set the active liquidity accordingly based on the start and end tick
         let price_a_by_b = (token_a_amount as f64) / (token_b_amount as f64);
 
@@ -390,7 +390,7 @@ impl Processor {
         let active_liquidity = value_to_sqrt_q6464(
             ((token_a_amount as f64) * (token_b_amount as f64)).sqrt()
         );
-
+        msg!("1");
         initialize_position_account(
             position_account,
             admin_account,
@@ -418,7 +418,7 @@ impl Processor {
         )?;
 
         let q6464_sqrt_price = value_to_sqrt_q6464(price_a_by_b);
-
+        msg!("1");
         // updating data of amm token account
         let updated_amm_token_account_data = AMMAccount::Initialized {
             pool_authority: *program_id,
@@ -541,8 +541,8 @@ impl Processor {
         let end_bitmap_index = end_tick / 80000;
 
         if start_bitmap_index == end_bitmap_index {
-            let (start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
-                &[format!("{}", start_bitmap_index).as_bytes(), amm_token_account_pda.as_array()],
+            let (_start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
+                &[b"bitmap", &start_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
                 amm_program_account.key
             );
             initialize_bitmap_account(
@@ -552,15 +552,15 @@ impl Processor {
                 system_program_account,
                 amm_program_account,
                 &amm_token_account_pda,
-                start_bitmap_index as u64
+                start_bitmap_index,program_id
             )?;
         } else {
             let (_start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
-                &[format!("{}", start_bitmap_index).as_bytes(), amm_token_account_pda.as_array()],
+                &[b"bitmap", &start_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
                 amm_program_account.key
             );
             let (_end_bitmap_address, end_bitmap_account_bump) = Pubkey::find_program_address(
-                &[format!("{}", end_bitmap_index).as_bytes(), amm_token_account_pda.as_array()],
+                &[b"bitmap", &end_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
                 amm_program_account.key
             );
             initialize_bitmap_account(
@@ -570,7 +570,7 @@ impl Processor {
                 system_program_account,
                 amm_program_account,
                 &amm_token_account_pda,
-                start_bitmap_index as u64
+                start_bitmap_index,program_id
             )?;
             initialize_bitmap_account(
                 end_bitmap_account,
@@ -579,7 +579,7 @@ impl Processor {
                 system_program_account,
                 amm_program_account,
                 &amm_token_account_pda,
-                end_bitmap_index as u64
+                end_bitmap_index,program_id
             )?;
             activate_bit(&mut start_bitmap_account.data.borrow_mut(), start_tick as u64);
             activate_bit(&mut end_bitmap_account.data.borrow_mut(), end_tick as u64);
@@ -681,7 +681,6 @@ impl Processor {
             delta_a.ceil() as u64
             // calculated_amount_a
         )?;
-        msg!("add 1");
         solana_program::program::invoke(
             &token_a_transfer_instruction,
             &[
@@ -702,7 +701,6 @@ impl Processor {
             delta_b.ceil() as u64
             // calculated_amount_b
         )?;
-        msg!("add 2");
         solana_program::program::invoke(
             &token_b_transfer_instruction,
             &[
@@ -889,7 +887,6 @@ impl Processor {
             &[amm_token_a_pool_account.key],
             (delta_a * token_a_decimals).ceil() as u64
         )?;
-        msg!("withdraw 1");
         solana_program::program::invoke_signed(
             &token_a_transfer_instruction,
             &[
@@ -917,7 +914,6 @@ impl Processor {
             &[amm_token_b_pool_account.key],
             (delta_b * token_b_decimals).ceil() as u64
         )?;
-        msg!("withdraw 2");
         solana_program::program::invoke_signed(
             &token_b_transfer_instruction,
             &[
@@ -1107,7 +1103,6 @@ impl Processor {
         // //16. tick_array_account_four (read only)
         // let tick_array_account_four = next_account_info(account_iter)?;
 
-        msg!("1");
         if mint_address_in != *token_a_mint_account.key {
             msg!("base mint address doesn't match the provided account");
             return Err(AMMError::InvalidMintAccount.into());
@@ -1116,7 +1111,6 @@ impl Processor {
             msg!("target mint address doesn't match the provided account");
             return Err(AMMError::InvalidMintAccount.into());
         }
-        msg!("1");
         let (amm_token_account_pda, _amm_token_account_bump) = get_lexicographical_token_pda(
             token_a_mint_account.key,
             token_b_mint_account.key,
@@ -1126,7 +1120,6 @@ impl Processor {
             msg!("Error: Invalid AMM token account provided.");
             return Err(AMMError::InvalidAMMTokenAccount.into());
         }
-        msg!("1");
         //validating token a pool account
         let (token_a_pool_account_pda, _token_a_pool_account_bump) = Pubkey::find_program_address(
             &[b"pool", amm_token_account_pda.as_array(), token_a_mint_account.key.as_array()],
@@ -1136,7 +1129,6 @@ impl Processor {
             msg!("Error: Invalid token A pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
-        msg!("1");
         //validating token b pool account
         let (token_b_pool_account_pda, token_b_pool_account_bump) = Pubkey::find_program_address(
             &[b"pool", amm_token_account_pda.as_array(), token_b_mint_account.key.as_array()],
@@ -1146,7 +1138,6 @@ impl Processor {
             msg!("Error: Invalid token B pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
-        msg!("1");
         let token_a_pool_data = spl_token_interface::state::Account::unpack_from_slice(
             &amm_token_a_pool_account.data.borrow()
         )?;
@@ -1155,10 +1146,8 @@ impl Processor {
             &amm_token_b_pool_account.data.borrow()
         )?;
         if token_b_pool_data.amount < minimum_amount_out {
-            msg!("bpool: {}, out: {}", token_b_pool_data.amount, minimum_amount_out);
             return Err(AMMError::InsufficientTokenBalance.into());
         }
-        msg!("1");
         // PRICE AND RETURNING TOKEN CALCULATION ---------------------------------------------------------------
         //amm token data
         let mut amm_token_enum = AMMAccount::unpack_from_slice(
@@ -1208,20 +1197,15 @@ impl Processor {
 
         //bit array one data
         let bitmap_one_enum = Bitmap::unpack_from_slice(&bitmap_account_one.data.borrow())?;
-        let (bitmap_one, bitmap_index_one) = match bitmap_one_enum {
-            Bitmap::Initialized { bitmap, index } => { (bitmap, index) }
-            _ => {
-                return Err(AMMError::AccountNotInitialized.into());
-            }
-        };
+        let bitmap_one = bitmap_one_enum.bitmap;
 
         let current_price = q6464_sqrt_to_value(*sqrt_price_a_by_b);
         let bitarray_index = get_bitarray_index(*current_tick);
 
-        if (bitarray_index as u64) != bitmap_index_one {
-            msg!("Invalid bitmap provided in instruction");
-            return Err(AMMError::InvalidBitmapArray.into());
-        }
+        // if (bitarray_index as u64) != bitmap_index_one {
+        //     msg!("Invalid bitmap provided in instruction");
+        //     return Err(AMMError::InvalidBitmapArray.into());
+        // }
         let tail = get_tail(*current_tick);
         let mut index = tail / 8;
         let mut position = 7 - (tail % 8);
@@ -1445,7 +1429,6 @@ pub fn initialize_amm_pool_account<'a>(
                 AMMAccount::LEN as u64,
                 amm_token_account.key
             );
-        msg!("5");
         solana_program::program::invoke_signed(
             &lp_token_mint_account_create_instruction,
             &[system_program_account.clone(), admin_account.clone(), amm_token_account.clone()],
@@ -1499,7 +1482,6 @@ pub fn initialize_lp_token_mint_account<'a>(
                 spl_token_interface::state::Mint::LEN as u64,
                 spl_token_program_account.key
             );
-        msg!("6");
 
         solana_program::program::invoke_signed(
             &lp_token_mint_account_create_instruction,
@@ -1523,7 +1505,6 @@ pub fn initialize_lp_token_mint_account<'a>(
         Some(lp_token_mint_account.key),
         0
     )?;
-    msg!("7");
 
     let _ = solana_program::program::invoke_signed(
         &lp_token_mint_instruction,
@@ -1570,7 +1551,6 @@ pub fn initialize_token_pool_accounts<'a>(
                 spl_token_interface::state::Account::LEN as u64,
                 spl_token_program_account.key
             );
-        msg!("8 : {}", token_a_pool_account.key);
 
         solana_program::program::invoke_signed(
             &token_a_pool_account_create_instruction,
@@ -1594,7 +1574,6 @@ pub fn initialize_token_pool_accounts<'a>(
                 spl_token_interface::state::Account::LEN as u64,
                 spl_token_program_account.key
             );
-        msg!("9");
 
         solana_program::program::invoke_signed(
             &token_b_pool_account_create_instruction,
@@ -1617,7 +1596,6 @@ pub fn initialize_token_pool_accounts<'a>(
             token_a_mint_account.key,
             token_a_pool_account.key
         )?;
-    msg!("10");
 
     let _ = solana_program::program::invoke_signed(
         &token_a_pool_account_initialize_instruction,
@@ -1645,7 +1623,6 @@ pub fn initialize_token_pool_accounts<'a>(
             token_b_mint_account.key,
             token_b_pool_account.key
         )?;
-    msg!("11");
 
     let _ = solana_program::program::invoke_signed(
         &token_b_pool_account_initialize_instruction,
@@ -1691,7 +1668,6 @@ pub fn initialize_admin_lp_token_account<'a>(
                 spl_token_interface::state::Account::LEN as u64,
                 spl_token_program_account.key
             );
-        msg!("12");
 
         solana_program::program::invoke_signed(
             &admin_lp_token_account_create_instruction,
@@ -1722,14 +1698,7 @@ pub fn initialize_admin_lp_token_account<'a>(
                 lp_token_mint_account.key,
                 admin_account.key
             )?;
-        msg!("13");
-        msg!(
-            "{}, {}, {}, {}",
-            spl_token_program_account.key,
-            admin_lp_token_account.key,
-            lp_token_mint_account.key,
-            sysvar_rent_account.key
-        );
+
         solana_program::program::invoke_signed(
             &admin_lp_token_account_initialize_instruction,
             &[
@@ -1801,6 +1770,20 @@ pub fn get_lexicographical_lp_token_pda(
     }
 }
 
+pub fn get_lexicographical_tokens_addresses<'a>(
+    x: &'a Pubkey,
+    y: &'a Pubkey,
+    seeds: &'a mut Vec<&'a [u8]>
+) -> &'a mut Vec<&'a [u8]> {
+    if *x.to_string() > *y.to_string() {
+        seeds.push(y.as_array());
+        seeds.push(x.as_array());
+    } else {
+        seeds.push(x.as_array());
+        seeds.push(y.as_array());
+    }
+    seeds
+}
 pub struct CreateV2 {
     /// The address of the new asset
     pub asset: solana_program::pubkey::Pubkey,
@@ -1973,7 +1956,6 @@ pub fn initialize_position_account<'a>(
                 PositionAccount::LEN as u64,
                 amm_program_account.key
             );
-        msg!("12");
 
         solana_program::program::invoke_signed(
             &admin_lp_token_account_create_instruction,
@@ -2148,7 +2130,8 @@ pub fn initialize_bitmap_account<'a>(
     system_program_account: &AccountInfo<'a>,
     amm_program_account: &AccountInfo<'a>,
     amm_token_account_pda: &Pubkey,
-    bitmap_index: u64
+    bitmap_index: u32,
+    program_id: &Pubkey
 ) -> ProgramResult {
     if bitmap_account.data.borrow().len() == 0 {
         let admin_lp_token_account_create_instruction =
@@ -2159,27 +2142,40 @@ pub fn initialize_bitmap_account<'a>(
                 Bitmap::LEN as u64,
                 amm_program_account.key
             );
-        msg!("12");
-
+        // let index_bytes = bitmap_index.to_be_bytes(); // Try LE if BE fails
+        msg!(
+            "{:?}, {:?}, {:?}, {:?}",
+            bitmap_index.to_be_bytes(),
+            bitmap_account_bump,
+            bitmap_account.key,
+            amm_token_account_pda
+        );
+        msg!("Current program id: {:?}", program_id);
+msg!("AMM program account key: {:?}", amm_program_account.key);
+        // let pda_bytes = amm_token_account_pda.as_ref();
+        // let bump_slice = [bitmap_account_bump];
         solana_program::program::invoke_signed(
             &admin_lp_token_account_create_instruction,
             &[system_program_account.clone(), admin_account.clone(), bitmap_account.clone()],
             &[
                 &[
-                    format!("{}", bitmap_index).as_bytes(),
-                    amm_token_account_pda.as_array(),
+                    b"bitmap",
+                    &bitmap_index.to_be_bytes(),
+                    amm_token_account_pda.as_ref(),
                     &[bitmap_account_bump],
                 ],
             ]
         )?;
     }
 
-    let bitmap = Bitmap::Initialized {
-        bitmap: vec![0 as u8;10000].try_into().expect("Too large bitmap array!"),
-        index: bitmap_index,
-    };
+    // let bitmap = Bitmap::Initialized {
+    //     bitmap: vec![0 as u8]
+    //         .try_into()
+    //         .expect("Too large bitmap array!"),
+    //     index: bitmap_index as u64,
+    // };
 
-    bitmap.pack_into_slice(&mut bitmap_account.data.borrow_mut());
+    // bitmap.pack_into_slice(&mut bitmap_account.data.borrow_mut());
 
     Ok(())
 }

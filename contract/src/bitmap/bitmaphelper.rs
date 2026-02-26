@@ -1,9 +1,11 @@
+use solana_program::msg;
+
 pub fn check_bit_status(bitarray: &[u8], tick: u64) -> u8 {
     let trail = tick % 80000;
     let index = trail / 8;
     let position = 7 - (trail % 8);
     let bits = bitarray[index as usize];
-    println!("check status : {}, {}, {}, {}", index, position, bits, bits >> position);
+    msg!("check status : {}, {}, {}, {}", index, position, bits, bits >> position);
     (bits >> position) & 1
 }
 

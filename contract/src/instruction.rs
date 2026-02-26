@@ -5,26 +5,26 @@ use solana_program::{ msg, program_error::ProgramError, pubkey::Pubkey };
 pub enum AMMInstruction {
     //accounts Indexes: InitializeTokenPool
     // 0. admin account (signer, writable)
-    // 1. system program account: 11111111111111111111111111111111 (read only)
+    // 1. nft_mint_account (writable)
     // 2. spl token program account: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA (read only)
     // 3. token A mint account (read only)
     // 4. token B mint account (read only)
     // 5. admin token A account (writable)
     // 6. admin token B account (writable)
-    // 7. lp_token_mint_account (writable)
-    // 8. admin lp token account (writable)
-    // 9. token A pool account (writable)
-    // 10. token B pool account (writable)
-    // 11. amm_token_account (writable)
-    // 12. sysvar_rent_account : SysvarRent111111111111111111111111111111111 (read only)
-    //13. amm_program_account (read only)
-    //14. nft_mint_account (writable)
-    //15. nft_token_account (writable)
-    //16. metaplex_core_program_account(read only)
-    //17. position_account(writable)
-    //18.first_tick_array_account(writable)
-    //19.last_tick_array_account(writable)
+    // 7. token A pool account (writable)
+    // 8. token B pool account (writable)
+    // 9. amm_token_account (writable)
+    // 10. sysvar_rent_account : SysvarRent111111111111111111111111111111111 (read only)
+    //11. amm_program_account (read only)
+    //12. system program account: 11111111111111111111111111111111 (read only)
+    //13. metaplex_core_program_account(read only)
+    //14. position_account(writable)
+    //15.first_tick_array_account(writable)
+    //16.last_tick_array_account(writable)
+    //17. start_bitmap_account(writable)
+    //18. end_bitmap_account(writable)
 
+    // 
     InitializeTokenPool {
         token_a_amount: u64,
         token_b_amount: u64,
