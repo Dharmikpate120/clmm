@@ -6,7 +6,7 @@ use sqlx::PgPool;
 
 use crate::transaction_handler::state::{AMMAccount, PositionAccount};
 
-pub async fn handle_create_market(token_account: Account, pg: &PgPool) -> anyhow::Result<()> {
+pub async fn handle_create_token_account(token_account: Account, pg: &PgPool) -> anyhow::Result<()> {
     let data = AMMAccount::unpack_from_slice(&token_account.data)?;
     match data {
         AMMAccount::Uninitialized => {

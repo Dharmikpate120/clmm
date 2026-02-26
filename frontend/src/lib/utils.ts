@@ -5,6 +5,7 @@ import {
   getProgramDerivedAddress,
   ProgramDerivedAddress,
   ProgramDerivedAddressBump,
+  ReadonlyUint8Array,
 } from 'gill'
 import { twMerge } from 'tailwind-merge'
 
@@ -19,7 +20,16 @@ export function ellipsify(str = '', len = 4, delimiter = '..') {
   return strLen >= limit ? str.substring(0, len) + delimiter + str.substring(strLen - len, strLen) : str
 }
 const addressEncoder = getAddressEncoder()
-
+export async function get_lexicographical_tokens_addresses(a:Address, b:Address, seeds:(string|ReadonlyUint8Array)[]): Promise<(string|ReadonlyUint8Array)[]>{
+  if (a.toString() > b.toString()){
+    seeds.push(addressEncoder.encode(b));
+    seeds.push(addressEncoder.encode(a));
+  }else{
+    seeds.push(addressEncoder.encode(a));
+    seeds.push(addressEncoder.encode(b));
+  }
+  return seeds;
+}
 export async function get_lexicographical_token_pda(
   a: Address,
   b: Address,

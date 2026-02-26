@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use solana_address::Address;
 use solana_message::compiled_instruction::CompiledInstruction;
 
-use crate::{db_helper::get_pg, rpc_helper::get_rpc, transaction_handler::handle_accounts::{handle_create_market, handle_update_token_account}};
+use crate::{db_helper::get_pg, rpc_helper::get_rpc, transaction_handler::handle_accounts::{handle_create_token_account, handle_update_token_account}};
 
 pub async fn handle_initialize_token_pool(
     account_keys: Vec<Address>,
@@ -23,7 +23,7 @@ pub async fn handle_initialize_token_pool(
 
     let token_account = account_details[11].clone().ok_or(anyhow!("Token account data missing!"))?;
 
-    handle_create_market(token_account, pg).await;
+    let _ = handle_create_token_account(token_account, pg).await;
 
     println!("handling initialize pool instruction");
     Ok(())

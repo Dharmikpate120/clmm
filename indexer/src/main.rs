@@ -1,4 +1,4 @@
-use lepo::{config::{self, Config}, db_helper::{get_pg, init_pg}, rpc_helper::{get_rpc, init_rpc_tcp}, transaction_handler::handle_transaction};
+use indexer::{config::{self, Config}, db_helper::{get_pg, init_pg}, rpc_helper::{get_rpc, init_rpc_tcp}, transaction_handler::handle_transaction};
 use solana_client::{
     pubsub_client::PubsubClient,
     rpc_config::{
