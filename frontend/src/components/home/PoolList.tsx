@@ -1,213 +1,278 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useEffect, useCallback } from "react";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
-import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import type { Market, MarketsResponse } from "@/lib/types/market";
 
-export default function PoolList() {
-    const pools = [
-        {
-            id: "sol-usdc",
-            name: "SOL-USDC",
-            fee: "0.05%",
-            type: "Concentrated",
-            price: "$143.25",
-            priceChange: "+2.15%",
-            tvl: "$85.2M",
-            vol24h: "$24.1M",
-            fees24h: "$12.4k",
-            apr: "48.2%",
-            aprLabel: "Rewards",
-            tokenA: "SOL",
-            tokenB: "USDC",
-            tokenAImg: "https://lh3.googleusercontent.com/aida-public/AB6AXuDrETAEdMSL3H499w94eluhcBFBsEKq6H4oIZhYfLaSHiYOMv81BQbHAy6PZ7aey9kD_UpolsmVdUdpfKoTz3OptcGWc4ijucd8WnhH0n2fJnwzYRwdZOUjdqrkbW_w7QXSsMIqFy5u2OM0Ff-_mT5HIVQ-bqlg1u_vzGWvOxSiLYr7Z816Y4IFIAHyZYDtNcIg1tciD8OEab2BjraEulEnwlk4s317vYzlPfis28uXg7B1CYqpILSnICDXLQr1DJmPF_rCEqc0OI0",
-            tokenBImg: "https://lh3.googleusercontent.com/aida-public/AB6AXuBxwkXGm9PHXmlFjOlqHsxu0zI_SEniw76tPKnm4KkYgtuxAc2_9YpDOr2SSBo2jGKK8FG7h150SpojXCwqP2jDhl03QlyhhnOqDpw4tgW1ASM3YQF0nVqaspCyMSo6LrC6AEaP2cZBhijYn9Sj_6qwY8ptexThUX725a3IHt9Y3-kag9n0dT1TPehsMK4XHg-czD-ZfYjq5EH9R7p-sO-mjO5TkJop9rJFeemFhmz9kxjn8oi_QjvivQGYMkAw4WavVNdW081DlGM",
-        },
-        {
-            id: "bonk-sol",
-            name: "BONK-SOL",
-            fee: "1.00%",
-            type: "Volatile",
-            price: "0.000021",
-            priceChange: "-4.32%",
-            priceChangeColor: "text-red-400",
-            tvl: "$12.4M",
-            vol24h: "$8.2M",
-            fees24h: "$82.1k",
-            apr: "124.5%",
-            aprLabel: "Hyper",
-            tokenA: "BONK",
-            tokenB: "SOL",
-            tokenAImg: "https://lh3.googleusercontent.com/aida-public/AB6AXuDAb2RZatGFJGz7I8rI2lLxdmGCavCJT-gNFOe8sSkS71svR5z-bVa5PnXo-gCJroWs2t3seM0x8dQxk2mNNFrv5lBzseHh2TDh3Vt0S6U3iWhqrReQHFk7CGwmCQspHxyqKDzfb2RytXrwB0SN6GyjsUilwFbP0ECUtMLNwY_6SJWdtYcLr8Xb4gpQ0i3SgntXYwL5wG10f8mwcThRXB-O2BOJU5vEZkn6uZZV9GMFlxV91AM4lZF1AKcDWZz_2ZRSRZFAmrfM3LA",
-            tokenBImg: "https://lh3.googleusercontent.com/aida-public/AB6AXuByVkQiDq-Niorggsp0GSSt4h09cWzwK8KS2vo1SS3utXEPTtRaGc-hbvs99MPZ8cRXW_dvDbpudnrnic0-ETz2ZD766iG3Jqk3UzrOl8pd17xtR0_79fapNmSWue2elIagDdi-AEm0L3usCIHU0-6m8LBxX_soaLYYrhQ74YH0iXRpO6yd9CPtw4NzT4IohoTWOGD_5eAXFTyi50sq22r1mEcNxVC2Ic-DujwXsJ7OeXXdWIznzpHvlo8N338tNnsTpKMs3CbuzPI",
-        },
-        {
-            id: "eth-usdc",
-            name: "ETH-USDC",
-            fee: "0.05%",
-            type: "Wormhole",
-            price: "$2,241.12",
-            priceChange: "+0.8%",
-            tvl: "$45.1M",
-            vol24h: "$12.8M",
-            fees24h: "$6.4k",
-            apr: "22.4%",
-            tokenA: "ETH",
-            tokenB: "USDC",
-            tokenAImg: "https://lh3.googleusercontent.com/aida-public/AB6AXuA7F2oJBJeDpuhe0w7FscGy_QsrZC0Qoe_mG2MK4672o9xlu_PpReJk2ZTG9llmuNq3Iq01qem2X0J-lJA8z2QHI2sL8wTNIDyTxfj8rIIuoQVXMsGA1TfUMINRZu_2zosw6STxLQKqFJL28EA_UpgSAhBzzCGpWv_Bqc1moWEGtaWDUjDQgbTKvXrz6QGep4P7kWLLKWIGi_6oQgHYYEL4IU_gPsql8_DTV_YDjqFqXlyBHdMetqkIXpN_9N26ipbsGSC1XI9aZXM",
-            tokenBImg: "https://lh3.googleusercontent.com/aida-public/AB6AXuAozFcaA2P4z5-tetzYIBND5Op96vsxE4pZtW7R1APf8JYor9wE9QsKfLnaG-UhGfocA5YQKlIW4IGvJ462iZQm2cKkFJ7ptHICn69mu5J9VQVqkFgfNSg07SMbTQyCJyyj0XiRrqotuZUWoLUHnFH1qXBINZRqEQnR1_xpMP-yVYiJS_RFQ_MJlsngPGgENXJQ4SnAKanbENtPvgccsd6gxIvbLJnED09IuB8Voyh7xRo8XgvnMPo1VR6gH_jN8ZMhjwQnri_8u9Y",
-        },
-        {
-            id: "jup-sol",
-            name: "JUP-SOL",
-            fee: "0.30%",
-            type: "Stable",
-            price: "0.0042",
-            priceChange: "+5.6%",
-            tvl: "$32.6M",
-            vol24h: "$18.9M",
-            fees24h: "$56.7k",
-            apr: "64.1%",
-            aprLabel: "Eco",
-            feeColor: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
-            tokenA: "JUP",
-            tokenB: "SOL",
-            tokenAImg: "https://lh3.googleusercontent.com/aida-public/AB6AXuCJlNqrBjPVk-Y9KV9wRuY93zyhfrBYAAahXajca4lq-12e1VD9gBnFyMUoap4Ic-3U1oPxwp-uzXmd9GnG_2rDrdVu7aco5l7ZiolZNVOn45JLEHlpfnKRbUKX3ZBvBTLkhV2t0zQ8aS_TRRLzOyM96L08PoFtPKeVqUv7o33cp44zEbD0vD-eHUOBRUbh87I3Gh7RKRFZsrO2JWor4LkA0YEx9rPevvWnO7AfskK-EM7booAmhimPXFgptwomBmJbZKisYyN6Cfs",
-            tokenBImg: "https://lh3.googleusercontent.com/aida-public/AB6AXuBIpS5PM0H3r8QpJzB3vowsRL6vZbhNer_KsOIYbD-0Ke349Zaoxd_kXFALed8Tg_exkiJ1lYf1KDButezFhh_29rXRaX9TqTCTMDYZaECYEKcZPUr3_xAioZl9eeOIc6FEEoDbgyMM-T5S6d_usKMVVwYU6AHJ52Bgk_yTdpg8K3Ix6KghSYoL6JsOjP1WiqkBxmaT7DOFv_C3vaKz8_5yF_jub_biPoc59niW9WBB6utmHrymlOf1meqK_T0c4tDvEU-7sohU3T0",
-        },
-        {
-            id: "usdt-usdc",
-            name: "USDT-USDC",
-            fee: "0.01%",
-            type: "Stableswap",
-            price: "$1.0002",
-            priceChange: "0.00%",
-            priceChangeColor: "text-gray-500",
-            tvl: "$142.1M",
-            vol24h: "$12.4M",
-            fees24h: "$1.2k",
-            apr: "4.2%",
-            feeColor: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
-            tokenA: "USDT",
-            tokenB: "USDC",
-            tokenAImg: "https://lh3.googleusercontent.com/aida-public/AB6AXuC6Nr2QFx9CCb_uxrOR0OJWFm9e2JpLTGWEsrBhP2jMrzyr1PGBS9-mmuM6udMsVX1dv0l1fSHpbGoJnDQ3WCnvm6Eo7dCyY6F9s367b0yRMqM9AFLJWvVFVl8T8lTTXpNmwqNF0cu0tAWrHlbu2vyMXS3zkCW3GK139k80hfArzf3Qh55iwygrJMu7dXqsX_2_XjaNpUFxWzCuiCrZTIYT-xDIo9e4M9J8EnPdq5Ir6iyP5tloIUXQsS7aBhbfLNqGTTdjMebmTQ8",
-            tokenBImg: "https://lh3.googleusercontent.com/aida-public/AB6AXuDziNG-m_8NyXoqeyAYYNxxq9QpEvPQQydTJfHMF5FjjTHNCqDAXBuNG-IXO0NDXwx8jerIlXHD_oO2KbYUOcJAtijRT1KYVrKdXyWV6-VKRzEckLt8H8FzxjrnrpiiPIDdvaWCVkFGEQkdFqDde3WmZwu5CH6jXtFQz4rJJThvRu8Fvd1SBuQD5D1P6ATFtgKnBAgKpw-kIBM0MFj8bUIHR3lQN3dOGAF4SeIrmgmq1-XEgTEM-cdYGVqUtduib6EN9kmVITRhFxo",
-        },
-    ];
+// ---- helpers ----------------------------------------------------------------
 
-    return (
-        <div className="bg-card rounded-2xl border border-border shadow-lg overflow-hidden">
-            <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-border bg-muted/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                <div className="col-span-4 md:col-span-3 flex items-center">Pool Name</div>
-                <div className="col-span-3 md:col-span-2 text-right cursor-pointer hover:text-primary flex items-center justify-end gap-1">
-                    Price <UnfoldMoreIcon fontSize="small" style={{ fontSize: '14px' }} />
-                </div>
-                <div className="hidden md:block col-span-2 text-right cursor-pointer hover:text-primary">
-                    TVL
-                </div>
-                <div className="col-span-3 md:col-span-2 text-right cursor-pointer hover:text-primary flex items-center justify-end gap-1">
-                    Vol 24H <ArrowDownwardIcon fontSize="small" style={{ fontSize: '14px' }} />
-                </div>
-                <div className="col-span-2 md:col-span-2 text-right">APR (24h)</div>
-                <div className="hidden md:block col-span-1 text-right">Action</div>
-            </div>
-            <div className="divide-y divide-border">
-                {pools.map((pool) => (
-                    <Link
-                        key={pool.id}
-                        href={`/pool/${pool.id}`}
-                        className="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-muted/50 transition-colors cursor-pointer group"
-                    >
-                        <div className="col-span-4 md:col-span-3 flex items-center">
-                            <div className="flex -space-x-2 mr-3 relative">
-                                <img
-                                    alt={pool.tokenA}
-                                    className="w-8 h-8 rounded-full border-2 border-background bg-black z-10"
-                                    src={pool.tokenAImg}
-                                />
-                                <img
-                                    alt={pool.tokenB}
-                                    className="w-8 h-8 rounded-full border-2 border-background bg-white z-0"
-                                    src={pool.tokenBImg}
-                                />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <span className="font-bold text-foreground">
-                                        {pool.name}
-                                    </span>
-                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${pool.feeColor || "bg-muted text-muted-foreground"}`}>
-                                        {pool.fee}
-                                    </span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                    {pool.type}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="col-span-3 md:col-span-2 text-right">
-                            <div className="font-mono text-sm font-medium text-foreground">
-                                {pool.price}
-                            </div>
-                            <div className={`text-xs ${pool.priceChangeColor || "text-secondary"}`}>
-                                {pool.priceChange}
-                            </div>
-                        </div>
-                        <div className="hidden md:block col-span-2 text-right">
-                            <div className="font-mono text-sm font-medium text-foreground">
-                                {pool.tvl}
-                            </div>
-                        </div>
-                        <div className="col-span-3 md:col-span-2 text-right">
-                            <div className="font-mono text-sm font-medium text-foreground">
-                                {pool.vol24h}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                Fees: {pool.fees24h}
-                            </div>
-                        </div>
-                        <div className="col-span-2 md:col-span-2 text-right">
-                            <div className="font-mono text-sm font-bold text-secondary">
-                                {pool.apr}
-                            </div>
-                            {pool.aprLabel && (
-                                <div className="text-xs text-primary dark:text-primary/80">
-                                    {pool.aprLabel}
-                                </div>
-                            )}
-                        </div>
-                        <div className="hidden md:block col-span-1 text-right">
-                            <button className="text-muted-foreground hover:text-primary-foreground hover:bg-primary border border-transparent hover:border-primary/30 p-2 rounded-lg transition-all cursor-pointer">
-                                <SwapHorizIcon fontSize="small" />
-                            </button>
-                        </div>
-                    </Link>
-                ))}
-            </div>
-            <div className="px-6 py-4 border-t border-border flex justify-center items-center gap-4 bg-muted/30">
-                <button className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white cursor-pointer">
-                    Previous
-                </button>
-                <div className="flex gap-2">
-                    <button className="w-8 h-8 rounded-lg bg-primary text-white text-sm font-medium flex items-center justify-center cursor-pointer">
-                        1
-                    </button>
-                    <button className="w-8 h-8 rounded-lg hover:bg-muted text-muted-foreground text-sm font-medium flex items-center justify-center transition-colors cursor-pointer">
-                        2
-                    </button>
-                    <button className="w-8 h-8 rounded-lg hover:bg-muted text-muted-foreground text-sm font-medium flex items-center justify-center transition-colors cursor-pointer">
-                        3
-                    </button>
-                    <span className="w-8 h-8 flex items-center justify-center text-gray-400">
-                        ...
-                    </span>
-                </div>
-                <button className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white cursor-pointer">
-                    Next
-                </button>
-            </div>
+function ellipsify(str: string, len = 4): string {
+  if (str.length <= len * 2 + 2) return str;
+  return `${str.slice(0, len)}..${str.slice(-len)}`;
+}
+
+/** Format a raw u128/2^64 float nicely */
+function fmtPrice(n: number): string {
+  if (n === 0) return "0";
+  if (n < 0.0001) return n.toExponential(4);
+  if (n < 1) return n.toFixed(6);
+  if (n < 1_000_000) return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  return n.toExponential(4);
+}
+
+function fmtLiquidity(n: number): string {
+  if (n === 0) return "0";
+  if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(2)}K`;
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+// ---- types for props --------------------------------------------------------
+
+export type PoolListFilters = {
+  search: string;
+  minPrice: string;
+  maxPrice: string;
+  minLiquidity: string;
+  maxLiquidity: string;
+  sort: "price" | "liquidity" | "fees";
+  order: "asc" | "desc";
+};
+
+interface PoolListProps {
+  filters: PoolListFilters;
+}
+
+// ---- component --------------------------------------------------------------
+
+export default function PoolList({ filters }: PoolListProps) {
+  const [markets, setMarkets] = useState<Market[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const limit = 10;
+
+  const fetchMarkets = useCallback(
+    async (currentPage: number) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams({
+          page: String(currentPage),
+          limit: String(limit),
+          sort: filters.sort,
+          order: filters.order,
+        });
+        if (filters.search) params.set("search", filters.search);
+        if (filters.minPrice) params.set("min_price", filters.minPrice);
+        if (filters.maxPrice) params.set("max_price", filters.maxPrice);
+        if (filters.minLiquidity) params.set("min_liquidity", filters.minLiquidity);
+        if (filters.maxLiquidity) params.set("max_liquidity", filters.maxLiquidity);
+
+        const res = await fetch(`/api/markets?${params.toString()}`);
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        const data: MarketsResponse = await res.json();
+        setMarkets(data.markets);
+        setTotal(data.total);
+        setTotalPages(data.totalPages);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to fetch markets");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filters],
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
+
+  useEffect(() => {
+    fetchMarkets(page);
+  }, [page, fetchMarkets]);
+
+  // ---- pagination helpers ---------------------------------------------------
+  const goToPage = (p: number) => {
+    if (p < 1 || p > totalPages) return;
+    setPage(p);
+  };
+
+  const pagesArray = (): (number | "...")[] => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (page <= 4) return [1, 2, 3, 4, 5, "...", totalPages];
+    if (page >= totalPages - 3) return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [1, "...", page - 1, page, page + 1, "...", totalPages];
+  };
+
+  // ---- render ---------------------------------------------------------------
+
+  return (
+    <div className="bg-card rounded-2xl border border-border shadow-lg overflow-hidden">
+      {/* Table header */}
+      <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-border bg-muted/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        <div className="col-span-4 md:col-span-3 flex items-center">Pool</div>
+        <div className="col-span-3 md:col-span-2 text-right flex items-center justify-end gap-1">
+          Price <UnfoldMoreIcon fontSize="small" style={{ fontSize: "14px" }} />
         </div>
-    );
+        <div className="hidden md:flex col-span-2 items-center justify-end gap-1">
+          Liquidity <ArrowDownwardIcon fontSize="small" style={{ fontSize: "14px" }} />
+        </div>
+        <div className="col-span-3 md:col-span-2 text-right">Tick</div>
+        <div className="col-span-2 md:col-span-2 text-right">Fees</div>
+        <div className="hidden md:block col-span-1 text-right">Action</div>
+      </div>
+
+      {/* Body */}
+      <div className="divide-y divide-border min-h-[200px]">
+        {loading && (
+          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+            <span className="animate-pulse">Loading markets…</span>
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="flex items-center justify-center py-16 text-destructive text-sm">
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && markets.length === 0 && (
+          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+            No markets found
+          </div>
+        )}
+
+        {!loading &&
+          !error &&
+          markets.map((market) => (
+            <Link
+              key={market.id}
+              href={`/pool/${market.market_address}`}
+              className="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-muted/50 transition-colors cursor-pointer group"
+            >
+              {/* Pool Name */}
+              <div className="col-span-4 md:col-span-3 flex items-center gap-3">
+                {/* Token pair icons placeholder */}
+                <div className="flex -space-x-2">
+                  <div className="w-8 h-8 rounded-full border-2 border-background bg-gradient-to-br from-primary/60 to-primary z-10 flex items-center justify-center text-[9px] font-bold text-white">
+                    A
+                  </div>
+                  <div className="w-8 h-8 rounded-full border-2 border-background bg-gradient-to-br from-secondary/60 to-secondary z-0 flex items-center justify-center text-[9px] font-bold text-white">
+                    B
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-foreground font-mono text-xs">
+                      {ellipsify(market.mint_address_a, 4)}/{ellipsify(market.mint_address_b, 4)}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground font-mono">
+                    {ellipsify(market.market_address, 6)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Price */}
+              <div className="col-span-3 md:col-span-2 text-right">
+                <div className="font-mono text-sm font-medium text-foreground">
+                  {fmtPrice(market.current_price)}
+                </div>
+                <div className="text-xs text-muted-foreground">sqrt price</div>
+              </div>
+
+              {/* Liquidity */}
+              <div className="hidden md:block col-span-2 text-right">
+                <div className="font-mono text-sm font-medium text-foreground">
+                  {fmtLiquidity(market.active_liquidity)}
+                </div>
+                {market.token_amount_a && market.token_amount_b && (
+                  <div className="text-[11px] text-muted-foreground font-mono">
+                    {ellipsify(market.token_amount_a, 3)} / {ellipsify(market.token_amount_b, 3)}
+                  </div>
+                )}
+              </div>
+
+              {/* Tick */}
+              <div className="col-span-3 md:col-span-2 text-right">
+                <div className="font-mono text-sm font-medium text-foreground">
+                  {market.current_tick.toLocaleString()}
+                </div>
+              </div>
+
+              {/* Fees */}
+              <div className="col-span-2 md:col-span-2 text-right">
+                <div className="font-mono text-sm font-bold text-secondary">
+                  {fmtLiquidity(market.fees)}
+                </div>
+              </div>
+
+              {/* Action */}
+              <div className="hidden md:block col-span-1 text-right">
+                <button className="text-muted-foreground hover:text-primary-foreground hover:bg-primary border border-transparent hover:border-primary/30 p-2 rounded-lg transition-all cursor-pointer">
+                  <SwapHorizIcon fontSize="small" />
+                </button>
+              </div>
+            </Link>
+          ))}
+      </div>
+
+      {/* Footer: stats + pagination */}
+      <div className="px-6 py-4 border-t border-border bg-muted/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <span className="text-xs text-muted-foreground">
+          {loading ? "" : `${total} market${total !== 1 ? "s" : ""} total`}
+        </span>
+
+        <div className="flex items-center gap-2">
+          <button
+            disabled={page <= 1 || loading}
+            onClick={() => goToPage(page - 1)}
+            className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer px-2"
+          >
+            Previous
+          </button>
+
+          <div className="flex gap-1">
+            {pagesArray().map((p, i) =>
+              p === "..." ? (
+                <span key={`ellipsis-${i}`} className="w-8 h-8 flex items-center justify-center text-muted-foreground text-sm">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => goToPage(p as number)}
+                  className={`w-8 h-8 rounded-lg text-sm font-medium flex items-center justify-center transition-colors cursor-pointer ${
+                    page === p
+                      ? "bg-primary text-white"
+                      : "hover:bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {p}
+                </button>
+              ),
+            )}
+          </div>
+
+          <button
+            disabled={page >= totalPages || loading}
+            onClick={() => goToPage(page + 1)}
+            className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer px-2"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
