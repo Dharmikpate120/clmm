@@ -1,4 +1,4 @@
-use indexer::{config::{self, Config}, db_helper::{get_pg, init_pg}, rpc_helper::{get_rpc, init_rpc_tcp}, transaction_handler::handle_transaction};
+use indexer::{config::{self, Config}, db_helper::{get_pg, init_pg}, rpc_helper::{get_rpc, init_rpc_tcp}, transaction_handler::{handle_transaction, instruction::CLMM_ADDRESS}};
 use solana_client::{
     pubsub_client::PubsubClient,
     rpc_config::{
@@ -24,17 +24,17 @@ async fn main() -> anyhow::Result<()> {
     let db = get_pg().await;
     sqlx::migrate!().run(db).await?;
     let pg = get_pg().await;
-    let market = sqlx::query!(
-                "INSERT INTO markets VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7, $8);",
-                "token_a_mint.to_string()",
-                "token_b_mint.to_string()",
-                "sqrt_price_a_by_b.to_string()",
-                "current_tick.to_string()",
-                "fee_growth.to_string()",
-                "active_liquidity.to_string()",
-                "token_a_pool.to_string()",
-                "token_b_pool.to_string()"
-            ).execute(pg).await;
+    // let market = sqlx::query!(
+    //             "INSERT INTO markets VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7, $8);",
+    //             "token_a_mint.to_string()",
+    //             "token_b_mint.to_string()",
+    //             "sqrt_price_a_by_b.to_string()",
+    //             "current_tick.to_string()",
+    //             "fee_growth.to_string()",
+    //             "active_liquidity.to_string()",
+    //             "token_a_pool.to_string()",
+    //             "token_b_pool.to_string()"
+    //         ).execute(pg).await;
 
     let mut connected = false;
     loop{
@@ -61,7 +61,7 @@ async fn connect(conf:&Config) -> anyhow::Result<()>{
 
     let (rpc_client_subscription, receiver) = PubsubClient::logs_subscribe(
         conf.rpc_websocket_url.clone(),
-        RpcTransactionLogsFilter::Mentions(vec!["KpxeS8pjg8P7o3b39cmfWd8KiZ1yc4gC2oFcYuc5beX".to_string()]),
+        RpcTransactionLogsFilter::Mentions(vec![CLMM_ADDRESS.to_string()]),
         RpcTransactionLogsConfig {
             commitment: Some(CommitmentConfig::confirmed()),
         }

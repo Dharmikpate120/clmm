@@ -30,10 +30,12 @@ pub async fn handle_transaction(
 
     match tx_message.message {
         VersionedMessage::Legacy(message) => {
-            handle_instructions(message.instructions, message.account_keys).await?;
+            println!("in 1");
+            handle_instructions(message.instructions, message.account_keys, transaction.slot).await?;
         }
         VersionedMessage::V0(message) => {
-            handle_instructions(message.instructions, message.account_keys).await?;
+            println!("in 2");
+            handle_instructions(message.instructions, message.account_keys,transaction.slot).await?;
         }
     }
 
@@ -42,15 +44,19 @@ pub async fn handle_transaction(
 
 pub async fn handle_instructions(
     instructions: Vec<CompiledInstruction>,
-    account_keys: Vec<Address>
+    account_keys: Vec<Address>,
+    slot: u64
 ) -> anyhow::Result<()> {
     for instruction in instructions {
+        println!("instructions: {:?}, {:?}", account_keys[instruction.program_id_index as usize],Address::from_str(CLMM_ADDRESS)?);
         // let data = bs58::decode(instruction.data).into_vec()?;
-        println!("instruction data: {:?}", instruction.data);
+        // println!("instruction data: {:?}", instruction.data);
         if account_keys[instruction.program_id_index as usize] != Address::from_str(CLMM_ADDRESS)? {
             continue;
         }
-        match CLMMInstruction::unpack(&instruction.data)? {
+        let decoded = CLMMInstruction::unpack(&instruction.data)?;
+        println!("handling: 1: {:?}", decoded);
+        match decoded {
             CLMMInstruction::InitializeTokenPool {
                 token_a_amount,
                 token_b_amount,
@@ -63,7 +69,8 @@ pub async fn handle_instructions(
                     token_a_amount,
                     token_b_amount,
                     start_tick,
-                    end_tick
+                    end_tick,
+                    slot
                 ).await?;
             }
             CLMMInstruction::AddLiquidity { liquidity, start_tick, end_tick } => {
@@ -72,14 +79,16 @@ pub async fn handle_instructions(
                     instruction.accounts,
                     liquidity,
                     start_tick,
-                    end_tick
+                    end_tick, 
+                    slot
                 ).await?;
             }
             CLMMInstruction::WithdrawLiquidity { minimum_liquidity } => {
                 handle_withdraw_liquidity(
                     account_keys.clone(),
                     instruction.accounts,
-                    minimum_liquidity
+                    minimum_liquidity,
+                    slot
                 ).await?;
             }
             CLMMInstruction::Swap {
@@ -94,7 +103,8 @@ pub async fn handle_instructions(
                     amount_in,
                     minimum_amount_out,
                     mint_address_in,
-                    mint_address_out
+                    mint_address_out,
+                    slot
                 ).await?;
             }
         }

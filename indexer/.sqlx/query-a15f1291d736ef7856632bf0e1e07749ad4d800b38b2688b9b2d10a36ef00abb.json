@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM position_accounts WHERE nft_address = $1;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a15f1291d736ef7856632bf0e1e07749ad4d800b38b2688b9b2d10a36ef00abb"
+}

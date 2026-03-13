@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO markets VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7, $8);",
+  "query": "INSERT INTO markets VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7, $8, $9);",
   "describe": {
     "columns": [],
     "parameters": {
@@ -12,10 +12,11 @@
         "Text",
         "Text",
         "Varchar",
+        "Varchar",
         "Varchar"
       ]
     },
     "nullable": []
   },
-  "hash": "1153dad05c22b587c22a8745344783d87b47bffeaca6fecf46c96af63f4108b6"
+  "hash": "59be851072b0a0fdbdc6ebcfcd4041f5ae64903c8f08648ab7eefa5ce8adb8f9"
 }

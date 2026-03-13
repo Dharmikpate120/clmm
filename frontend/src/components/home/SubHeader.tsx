@@ -9,7 +9,24 @@ import { useTheme as useNextTheme } from 'next-themes'
 import initializeAmmAccount from '@/lib/actions/initializeAmmAccount'
 import { useWalletUi, useWalletUiSigner } from '@wallet-ui/react'
 import { useWalletUiSignAndSend } from '@wallet-ui/react-gill'
-
+const initialState = {
+  /* 
+  spl-token create-token --decimals 0
+  */
+    token_a_mint_account: '6rxGJAE7xLLSogfhLpnJNixbBoAAosNSn2KAVcuJKg8d',
+    token_b_mint_account: 'FYAehxG1mMrVd5vftv72TdkKfjkj6VzwwmbfpCp6nxhY',
+    /* 
+  spl-token create-account FYAehxG1mMrVd5vftv72TdkKfjkj6VzwwmbfpCp6nxhY
+  spl-token mint FYAehxG1mMrVd5vftv72TdkKfjkj6VzwwmbfpCp6nxhY 200000 -- Ds7GLgYzr2i3J4KFA4TPbFyJgFG2GwfSLvV1xYSbi96H
+  */
+    admin_token_a_account: 'AXNfEoew1PRokiSCPzAAQunHJMP7jr1zSxPcFfi2zy8q',
+    admin_token_b_account: 'Ds7GLgYzr2i3J4KFA4TPbFyJgFG2GwfSLvV1xYSbi96H',
+    token_a_amount: '10000',
+    token_b_amount: '1000',
+    start_tick: '22000',
+    end_tick: '34000',
+    admin_account: 'GK5uAKRv4Abn4szsDuhvcBDoYp8cwAcggkkynMjmSZf3',
+  }
 export default function SubHeader() {
   const walletUi = useWalletUi()
   //   const client = useWalletUiGill()
@@ -20,17 +37,7 @@ export default function SubHeader() {
 
   const muiTheme = useTheme()
   const [openModal, setOpenModal] = useState(false)
-  const [formData, setFormData] = useState({
-    token_a_mint_account: '6pXNd5iDL3kqz8MxGiqZu4hb9vB9KbrPknGJ5vXfkMgd',
-    token_b_mint_account: 'DB1xwND2situnNxmSCF3XNHnXXayLPoNSHDKJEfNiwpP',
-    admin_token_a_account: 'cfqVCaPpWougv7Kq8kamHk3oZRNYhrTK6QURcACe1xt',
-    admin_token_b_account: 'ADE1HAFKUiNSvWyLUDoQmLsNCqUKm297m6HRfx9GPynn',
-    token_a_amount: '100',
-    token_b_amount: '10',
-    start_tick: '22000',
-    end_tick: '34000',
-    admin_account: 'GK5uAKRv4Abn4szsDuhvcBDoYp8cwAcggkkynMjmSZf3',
-  })
+  const [formData, setFormData] = useState(initialState)
 
   const isDark = resolvedTheme === 'dark'
 
@@ -58,17 +65,7 @@ export default function SubHeader() {
 
     setOpenModal(false)
     // Reset form if needed
-    setFormData({
-      token_a_mint_account: '6pXNd5iDL3kqz8MxGiqZu4hb9vB9KbrPknGJ5vXfkMgd',
-      token_b_mint_account: 'DB1xwND2situnNxmSCF3XNHnXXayLPoNSHDKJEfNiwpP',
-      admin_token_a_account: 'cfqVCaPpWougv7Kq8kamHk3oZRNYhrTK6QURcACe1xt',
-      admin_token_b_account: 'ADE1HAFKUiNSvWyLUDoQmLsNCqUKm297m6HRfx9GPynn',
-      token_a_amount: '100',
-      token_b_amount: '10',
-      start_tick: '22000',
-      end_tick: '34000',
-      admin_account: 'GK5uAKRv4Abn4szsDuhvcBDoYp8cwAcggkkynMjmSZf3',
-    })
+    setFormData(initialState)
   }
 
   const textFieldSx = {

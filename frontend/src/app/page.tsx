@@ -99,50 +99,6 @@ function ConnectedComponent() {
     setSwapTokensData((prev) => ({ ...prev, [id]: value }))
   }
 
-  const handleAddLiquidity = async () => {
-    const isAnyFieldEmpty = Object.values(addLiquidityData).some((value) => value === '')
-    if (isAnyFieldEmpty) {
-      const errorMessage = 'All fields are required. Please fill in all the details.'
-      setError(errorMessage)
-      toast.error(errorMessage)
-      return
-    }
-    if (!walletUi.account) {
-      setError("Wallet not connected!");
-      toast.error("Wallet not connected!");
-      return;
-    }
-    setError(null)
-    const instruction = await addLiquidity({ ...addLiquidityData, provider_account: walletUi.account.address });
-    if (!walletUi.account || !instruction) {
-      return;
-    }
-    const result = await sender([instruction!], signer);
-    console.log(result);
-
-  }
-
-  const handleWithdrawLiquidity = async () => {
-    const isAnyFieldEmpty = Object.values(withdrawLiquidityData).some((value) => value === '')
-    if (isAnyFieldEmpty) {
-      const errorMessage = 'All fields are required. Please fill in all the details.'
-      setError(errorMessage)
-      toast.error(errorMessage)
-      return
-    }
-    if (!walletUi.account) {
-      setError("Wallet not connected!");
-      toast.error("Wallet not connected!");
-      return;
-    }
-    setError(null)
-    const instruction = await withdrawLiquidity({ ...withdrawLiquidityData, provider_account: walletUi.account.address });
-    if (!walletUi.account || !instruction) {
-      return;
-    }
-    const result = await sender([instruction!], signer);
-    console.log(result);
-  }
 
   const handleSwapTokens = async () => {
     const isAnyFieldEmpty = Object.values(swapTokensData).some((value) => value === '')

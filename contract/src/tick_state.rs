@@ -8,39 +8,41 @@ use solana_program::{
 use crate::state::TICK_ARRAY_SIZE;
 
 
+// #[derive(BorshDeserialize, BorshSerialize, Copy, Clone)]
+// pub struct TickState {
+//        pub net_liquidity: i64,
+//         // pub tick_index: u32,
+// }
+// impl Default for TickState{
+//     fn default() -> Self {
+//         TickState{
+//             net_liquidity: 0,
+//             tick_index: 0
+//         }
+//     }
+// }
 #[derive(BorshDeserialize, BorshSerialize)]
-pub struct TickState {
-       pub net_liquidity: i64,
-        pub tick_index: u32,
-}
-
-#[derive(BorshDeserialize, BorshSerialize)]
-pub enum TickArray {
-    Uninitialized,
-    Initialized{
-        ticks: Vec<TickState>,
-        start_tick_index: u32,
-        array_index: u32,
-    }
+pub struct TickArray {
+    pub ticks: [i64; TICK_ARRAY_SIZE as usize]
 }
 
 // The `Sealed` trait is a marker trait to prevent
 // other crates from implementing `Pack` for our state.
 impl Sealed for TickArray {}
 
-impl IsInitialized for TickArray {
-    /// Checks if the account has been initialized.
-    fn is_initialized(&self) -> bool {
-        match self{
-            TickArray::Initialized{  .. } => true,
-            _ => false,
-        }
-    }
-}
+// impl IsInitialized for TickArray {
+//     /// Checks if the account has been initialized.
+//     fn is_initialized(&self) -> bool {
+//         match self{
+//             TickArray::Initialized{  .. } => true,
+//             _ => false,
+//         }
+//     }
+// }
 
 impl Pack for TickArray {
     /// The length of the account's data in bytes.
-    const LEN: usize = 1 + (4 + (20) * TICK_ARRAY_SIZE as usize) + 4 + 4;
+    const LEN: usize = 8 * TICK_ARRAY_SIZE as usize;
     //  + 8;
 
     /// Deserializes a byte slice into a [StakeAccount].

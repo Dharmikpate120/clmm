@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE user_token_accounts SET balance = $1 WHERE user_address = $2 AND token_mint_address = $3;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6b2f9189448fd81c9812f99d53700eeb00eb2efc66a74d8670ae7f16607a542c"
+}

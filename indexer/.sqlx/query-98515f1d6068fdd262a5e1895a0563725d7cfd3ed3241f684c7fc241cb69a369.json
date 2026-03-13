@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM user_token_accounts WHERE user_address = $1 AND token_mint_address = $2;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_address",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "token_mint_address",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "token_address",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "balance",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "98515f1d6068fdd262a5e1895a0563725d7cfd3ed3241f684c7fc241cb69a369"
+}

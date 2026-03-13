@@ -5,16 +5,148 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
-
+import addLiquidity from "@/lib/actions/addLiquidity";
+import { AmmAddLiquidity } from "@/lib/types";
+const initial_state = {
+    token_a_mint_account: "6rxGJAE7xLLSogfhLpnJNixbBoAAosNSn2KAVcuJKg8d",
+        token_b_mint_account: "FYAehxG1mMrVd5vftv72TdkKfjkj6VzwwmbfpCp6nxhY",
+        provider_token_a_account: "AXNfEoew1PRokiSCPzAAQunHJMP7jr1zSxPcFfi2zy8q",
+        provider_token_b_account: "Ds7GLgYzr2i3J4KFA4TPbFyJgFG2GwfSLvV1xYSbi96H",
+        liquidity: "1000",
+        start_tick: "20000",
+        end_tick: "40000",
+        provider_account: "GK5uAKRv4Abn4szsDuhvcBDoYp8cwAcggkkynMjmSZf3"
+   
+}
 export default function AddLiquidityModal() {
+    // AmmAddLiquidity form fields in a single state object
+    const [formData, setFormData] = useState<AmmAddLiquidity>(initial_state);
+
     const [minPrice, setMinPrice] = useState("138.50");
     const [maxPrice, setMaxPrice] = useState("148.50");
     const [currentPrice] = useState(143.25);
 
+    const handleAddLiquidity = async () => {
+        const instruction = await addLiquidity(formData);
+        // Reset form data
+        // setFormData(initial_state);
+        // Reset price fields
+        setMinPrice("138.50");
+        setMaxPrice("148.50");
+    };
+
     return (
         <div className="space-y-6">
-            {/* 1. Select Pair & Fee Tier */}
+            {/* 0. AmmAddLiquidity Form Fields */}
             <div className="space-y-4">
+                <h4 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs">
+                        0
+                    </span>
+                    Liquidity Configuration
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-4 rounded-xl border border-border focus-within:border-primary transition-colors">
+                        <label className="block text-xs text-gray-500 mb-2">
+                            Token A Mint Account
+                        </label>
+                        <input
+                            className="w-full bg-transparent text-sm font-mono focus:outline-none text-foreground placeholder-muted-foreground"
+                            placeholder="Enter Token A mint address"
+                            type="text"
+                            value={formData.token_a_mint_account}
+                            onChange={(e) => setFormData({...formData, token_a_mint_account: e.target.value})}
+                        />
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-xl border border-border focus-within:border-primary transition-colors">
+                        <label className="block text-xs text-gray-500 mb-2">
+                            Token B Mint Account
+                        </label>
+                        <input
+                            className="w-full bg-transparent text-sm font-mono focus:outline-none text-foreground placeholder-muted-foreground"
+                            placeholder="Enter Token B mint address"
+                            type="text"
+                            value={formData.token_b_mint_account}
+                            onChange={(e) => setFormData({...formData, token_b_mint_account: e.target.value})}
+                        />
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-xl border border-border focus-within:border-primary transition-colors">
+                        <label className="block text-xs text-gray-500 mb-2">
+                            Provider Token A Account
+                        </label>
+                        <input
+                            className="w-full bg-transparent text-sm font-mono focus:outline-none text-foreground placeholder-muted-foreground"
+                            placeholder="Enter provider Token A account"
+                            type="text"
+                            value={formData.provider_token_a_account}
+                            onChange={(e) => setFormData({...formData, provider_token_a_account: e.target.value})}
+                        />
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-xl border border-border focus-within:border-primary transition-colors">
+                        <label className="block text-xs text-gray-500 mb-2">
+                            Provider Token B Account
+                        </label>
+                        <input
+                            className="w-full bg-transparent text-sm font-mono focus:outline-none text-foreground placeholder-muted-foreground"
+                            placeholder="Enter provider Token B account"
+                            type="text"
+                            value={formData.provider_token_b_account}
+                            onChange={(e) => setFormData({...formData, provider_token_b_account: e.target.value})}
+                        />
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-xl border border-border focus-within:border-primary transition-colors">
+                        <label className="block text-xs text-gray-500 mb-2">
+                            Liquidity Amount
+                        </label>
+                        <input
+                            className="w-full bg-transparent text-sm font-mono focus:outline-none text-foreground placeholder-muted-foreground"
+                            placeholder="Enter liquidity amount"
+                            type="text"
+                            value={formData.liquidity}
+                            onChange={(e) => setFormData({...formData, liquidity: e.target.value})}
+                        />
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-xl border border-border focus-within:border-primary transition-colors">
+                        <label className="block text-xs text-gray-500 mb-2">
+                            Provider Account
+                        </label>
+                        <input
+                            className="w-full bg-transparent text-sm font-mono focus:outline-none text-foreground placeholder-muted-foreground"
+                            placeholder="Enter provider account"
+                            type="text"
+                            value={formData.provider_account}
+                            onChange={(e) => setFormData({...formData, provider_account: e.target.value})}
+                        />
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-xl border border-border focus-within:border-primary transition-colors">
+                        <label className="block text-xs text-gray-500 mb-2">
+                            Start Tick
+                        </label>
+                        <input
+                            className="w-full bg-transparent text-sm font-mono focus:outline-none text-foreground placeholder-muted-foreground"
+                            placeholder="Enter start tick"
+                            type="text"
+                            value={formData.start_tick}
+                            onChange={(e) => setFormData({...formData, start_tick: e.target.value})}
+                        />
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-xl border border-border focus-within:border-primary transition-colors">
+                        <label className="block text-xs text-gray-500 mb-2">
+                            End Tick
+                        </label>
+                        <input
+                            className="w-full bg-transparent text-sm font-mono focus:outline-none text-foreground placeholder-muted-foreground"
+                            placeholder="Enter end tick"
+                            type="text"
+                            value={formData.end_tick}
+                            onChange={(e) => setFormData({...formData, end_tick: e.target.value})}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* 1. Select Pair & Fee Tier */}
+            {/* <div className="space-y-4">
                 <h4 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
                     <span className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs">
                         1
@@ -60,10 +192,10 @@ export default function AddLiquidityModal() {
                         </button>
                     </div>
                 </div>
-            </div>
+            </div> */}
 
             {/* 2. Set Price Range */}
-            <div className="space-y-4">
+            {/* <div className="space-y-4">
                 <div className="flex justify-between items-center">
                     <h4 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
                         <span className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs">
@@ -146,10 +278,10 @@ export default function AddLiquidityModal() {
                         <div className="text-xs text-gray-400 mt-1">USDC per SOL</div>
                     </div>
                 </div>
-            </div>
+            </div> */}
 
             {/* 3. Deposit Amount */}
-            <div className="space-y-4">
+            {/* <div className="space-y-4">
                 <h4 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
                     <span className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs">
                         3
@@ -208,7 +340,7 @@ export default function AddLiquidityModal() {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div> */}
 
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl flex gap-3 text-xs text-blue-700 dark:text-blue-300">
                 <HelpOutlineIcon fontSize="small" className="shrink-0" />
@@ -220,7 +352,10 @@ export default function AddLiquidityModal() {
                 </p>
             </div>
 
-            <button className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl shadow-glow-primary transition-all text-lg cursor-pointer">
+            <button 
+                onClick={handleAddLiquidity}
+                className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl shadow-glow-primary transition-all text-lg cursor-pointer"
+            >
                 Add Liquidity
             </button>
         </div>

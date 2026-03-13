@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE position_accounts SET user_address = $1,  start_tick = $2, end_tick = $3, liquidity = $4 where nft_address = $5;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "452dfbb971a87fe9ec83747d721f73d88315620bfe24e3f78c34e72fe80229cc"
+}

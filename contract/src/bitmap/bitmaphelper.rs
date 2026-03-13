@@ -14,15 +14,19 @@ pub fn check_bit_status_u8(bits: &u8, index: u8) -> u8 {
 }
 
 pub fn activate_bit(bitarray: &mut [u8], tick: u64) -> &mut [u8] {
+
     let status = check_bit_status(bitarray, tick);
+    msg!("tick : {:?}, status : {:?}", tick, status);
     if status == 0 {
         let trail = tick % 10000;
         let index = trail / 8;
         let position = 7 - (trail % 8);
         let bits = &mut bitarray[index as usize];
-
+        msg!("trail: {:?}, index: {:?}, position: {:?}, bits before: {:?}", trail, index, position, bits);
         *bits |= 1 << position;
+        msg!("bits after: {:?}", bits);
     }
+    msg!("1: {}, 2: {}, 3: {}, 4:{}", bitarray[0], bitarray[1], bitarray[2], bitarray[3]);
     bitarray
 }
 

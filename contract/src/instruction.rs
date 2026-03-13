@@ -24,7 +24,7 @@ pub enum AMMInstruction {
     //17. start_bitmap_account(writable)
     //18. end_bitmap_account(writable)
 
-    // 
+    //
     InitializeTokenPool {
         token_a_amount: u64,
         token_b_amount: u64,
@@ -32,24 +32,24 @@ pub enum AMMInstruction {
         end_tick: u32,
     },
 
-    //1. liquidity_provider_account(signer, writable)
-    //2. spl_token_account (readonly)
-    //3. amm_token_account(writable)
-    //4. amm_token_a_pool_account(writable)
-    //5. amm_token_b_pool_account(writable)
-    //6. provider_token_a_account(writabler)
-    //7. provider_token_b_account(writable)
-    //8. nft_mint_account(writable)
-    //9. lp_token_mint_account(writable)
-    //10. sysvar_rent_account (readonly)
-    //11. token_a_mint_account(read only)
-    //12. token_b_mint_account(read only)
-    //13. system_program_account(read only)
-    //14. amm_program_account (read only)
-    //15. metaplex_core_program_account(read only)
-    //16. position_account(writable)
-    //17. first_tick_array_account(writable)
-    //18. last_tick_array_account(writable)
+    //0. liquidity_provider_account(signer, writable)
+    //1. nft_mint_account(writable)
+    //2. amm_token_account(writable)
+    //3. amm_token_a_pool_account(writable)
+    //4. amm_token_b_pool_account(writable)
+    //5. provider_token_a_account(writabler)
+    //6. provider_token_b_account(writable)
+    //7. spl_token_account (readonly)
+    //8. token_a_mint_account(read only)
+    //9. token_b_mint_account(read only)
+    //10. system_program_account(read only)
+    //11. amm_program_account (read only)
+    //12. metaplex_core_program_account(read only)
+    //13. position_account(writable)
+    //14. first_tick_array_account(writable)
+    //15. last_tick_array_account(writable)
+    //16. start_bitmap_account(writable)
+    //17. end_bitmap_account
 
     AddLiquidity {
         liquidity: f64,
@@ -57,25 +57,24 @@ pub enum AMMInstruction {
         end_tick: u32,
     },
 
-    //1. liquidity_provider_account(signer, writable)
-    //2. spl_token_account (readonly)
-    //3. amm_token_account(writable)
-    //4. amm_token_a_pool_account(writable)
-    //5. amm_token_b_pool_account(writable)
-    //6. provider_token_a_account(writable)
-    //7. provider_token_b_account(writable)
-    //8. nft_mint_account(writable)
-    //9. lp_token_mint_account(writable)
-    //10.sysvar_rent_account (readonly)
-    //11. token_a_mint_account(read only)
-    //12. token_b_mint_account(read only)
-    //13. system_program_account(read only)
-    //14. amm_program_account (read only)
-    //15. metaplex_core_program_account(read only)
-    //16. position_account(writable)
-    //17. first_tick_array_account(writable)
-    //18. last_tick_array_account(writable)
-
+    //0. liquidity_provider_account(signer, writable)
+    //1. nft_mint_account(readonly)
+    //2. amm_token_account(writable)
+    //3. amm_token_a_pool_account(writable)
+    //4. amm_token_b_pool_account(writable)
+    //5. provider_token_a_account(writable)
+    //6. provider_token_b_account(writable)
+    //7. spl_token_account (readonly)
+    //8. token_a_mint_account(read only)
+    //9. token_b_mint_account(read only)
+    //10. system_program_account(read only)
+    //11. amm_program_account (read only)
+    //12. position_account(writable)
+    //13. first_tick_array_account(writable)
+    //14. last_tick_array_account(writable)
+    //15. start_bitmap_account(writable)
+    //16. end_bitmap_account(writable)
+    
     WithdrawLiquidity {
         minimum_liquidity: u64,
     },
@@ -88,21 +87,18 @@ pub enum AMMInstruction {
     //6. swapper_token_b_account(writable)
     //7. token_a_mint_account(read only)
     //8. token_b_mint_account(read only)
-    //9. system_program_account(read only)
-    //10. amm_program_account (read only)
-    //11. bitmap_account_one: (read only)
-    //12. bitmap_account_two: (read only)
-    //13. tick_array_account_one (read only)
-    //14. tick_array_account_two (read only)
-    //15. tick_array_account_three (read only)
-    //16. tick_array_account_four (read only)
+    //9. amm_program_account (read only)
+    //10. bitmap_account_one: (read only)
+    //11. bitmap_account_two: (read only)
+    //12. tick_array_account_one (read only)
+    //13. tick_array_account_two (read only)
+    //14. tick_array_account_three (read only)
+    //15. tick_array_account_four (read only)
     Swap {
         amount_in: u64,
         minimum_amount_out: u64,
         mint_address_in: Pubkey,
         mint_address_out: Pubkey,
-        // bitmap_account_number: u32,
-        // tick_account_number: u32
     },
 
     InitializeTradingAccount,

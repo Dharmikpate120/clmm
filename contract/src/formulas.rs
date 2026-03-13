@@ -25,5 +25,5 @@ pub fn calculate_delta_b(lower_price: f64, higher_price: f64, liquidity: f64) ->
     let sqrt_lower = lower_price.sqrt();
     let sqrt_higher = higher_price.sqrt();
 
-    liquidity * ((1 as f64 / sqrt_higher - 1 as f64 / sqrt_lower) as f64)
+    liquidity * ((1 as f64 / sqrt_lower - 1 as f64 / sqrt_higher) as f64)
 }

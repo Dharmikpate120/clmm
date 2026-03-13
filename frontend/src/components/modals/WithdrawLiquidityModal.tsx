@@ -3,11 +3,38 @@
 import { useState } from "react";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import type { AmmWithdrawLiquidity } from "@/lib/types";
+import withdrawLiquidity from "@/lib/actions/withdrawLiquidity";
+
+const initialWithdrawState: AmmWithdrawLiquidity = {
+    token_a_mint_account: "6rxGJAE7xLLSogfhLpnJNixbBoAAosNSn2KAVcuJKg8d",
+    token_b_mint_account: "FYAehxG1mMrVd5vftv72TdkKfjkj6VzwwmbfpCp6nxhY",
+    provider_token_a_account: "AXNfEoew1PRokiSCPzAAQunHJMP7jr1zSxPcFfi2zy8q",
+    provider_token_b_account: "Ds7GLgYzr2i3J4KFA4TPbFyJgFG2GwfSLvV1xYSbi96H",
+    minimum_liquidity: "100",
+    provider_account: "GK5uAKRv4Abn4szsDuhvcBDoYp8cwAcggkkynMjmSZf3",
+    nft_mint_account: "86Mmzwup1gymUkSdF4P8FwAjwVASQsPeQzRRCZHHt5dM",
+};
 
 export default function WithdrawLiquidityModal() {
-    const [step, setStep] = useState(1);
+    const [step, setStep] = useState(2);
     const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
     const [withdrawPercent, setWithdrawPercent] = useState(50);
+    const [withdrawalData, setWithdrawalData] = useState<AmmWithdrawLiquidity>(initialWithdrawState);
+
+    const handleWithdrawalInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setWithdrawalData((prevState) => ({
+            ...prevState,
+            [name]: value,
+        }));
+    };
+
+    const submitWithdrawalState =async () => {
+        const instruction = await withdrawLiquidity(withdrawalData);
+        console.log(instruction);
+        setWithdrawalData(initialWithdrawState);
+    };
 
     // Step 1: Select Position
     if (step === 1) {
@@ -108,7 +135,7 @@ export default function WithdrawLiquidityModal() {
     // Step 2: Confirm & Amount
     return (
         <div className="space-y-6">
-            <div className="bg-muted/50 rounded-xl p-4 border border-border flex items-center justify-between">
+            {/* <div className="bg-muted/50 rounded-xl p-4 border border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold">
                         #{selectedPosition}
@@ -126,9 +153,9 @@ export default function WithdrawLiquidityModal() {
                 >
                     Change
                 </button>
-            </div>
+            </div> */}
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
                 <div className="flex justify-between">
                     <label className="text-sm font-bold text-foreground">
                         Withdraw Amount
@@ -149,9 +176,9 @@ export default function WithdrawLiquidityModal() {
                     <button onClick={() => setWithdrawPercent(75)} className="hover:text-primary cursor-pointer">75%</button>
                     <button onClick={() => setWithdrawPercent(100)} className="hover:text-primary cursor-pointer">Max</button>
                 </div>
-            </div>
+            </div> */}
 
-            <div className="bg-muted/50 rounded-xl p-4 border border-border space-y-3">
+            {/* <div className="bg-muted/50 rounded-xl p-4 border border-border space-y-3">
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                     You Receive
                 </h4>
@@ -187,9 +214,119 @@ export default function WithdrawLiquidityModal() {
                     </div>
                     <div className="font-mono text-foreground font-bold">~$6.24</div>
                 </div>
+            </div> */}
+
+            <div className="space-y-4 bg-muted/30 rounded-xl p-4 border border-border">
+                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Withdrawal Details
+                </h4>
+                
+                <div>
+                    <label className="text-sm font-bold text-foreground block mb-2">
+                        Token A Mint Account
+                    </label>
+                    <input
+                        type="text"
+                        name="token_a_mint_account"
+                        value={withdrawalData.token_a_mint_account}
+                        onChange={handleWithdrawalInputChange}
+                        placeholder="Enter token A mint account"
+                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
+                    />
+                </div>
+
+                <div>
+                    <label className="text-sm font-bold text-foreground block mb-2">
+                        Token B Mint Account
+                    </label>
+                    <input
+                        type="text"
+                        name="token_b_mint_account"
+                        value={withdrawalData.token_b_mint_account}
+                        onChange={handleWithdrawalInputChange}
+                        placeholder="Enter token B mint account"
+                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
+                    />
+                </div>
+
+                <div>
+                    <label className="text-sm font-bold text-foreground block mb-2">
+                        Provider Token A Account
+                    </label>
+                    <input
+                        type="text"
+                        name="provider_token_a_account"
+                        value={withdrawalData.provider_token_a_account}
+                        onChange={handleWithdrawalInputChange}
+                        placeholder="Enter provider token A account"
+                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
+                    />
+                </div>
+
+                <div>
+                    <label className="text-sm font-bold text-foreground block mb-2">
+                        Provider Token B Account
+                    </label>
+                    <input
+                        type="text"
+                        name="provider_token_b_account"
+                        value={withdrawalData.provider_token_b_account}
+                        onChange={handleWithdrawalInputChange}
+                        placeholder="Enter provider token B account"
+                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
+                    />
+                </div>
+
+                <div>
+                    <label className="text-sm font-bold text-foreground block mb-2">
+                        Minimum Liquidity
+                    </label>
+                    <input
+                        type="text"
+                        name="minimum_liquidity"
+                        value={withdrawalData.minimum_liquidity}
+                        onChange={handleWithdrawalInputChange}
+                        placeholder="Enter minimum liquidity"
+                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
+                    />
+                </div>
+
+                <div>
+                    <label className="text-sm font-bold text-foreground block mb-2">
+                        Provider Account
+                    </label>
+                    <input
+                        type="text"
+                        name="provider_account"
+                        value={withdrawalData.provider_account}
+                        onChange={handleWithdrawalInputChange}
+                        placeholder="Enter provider account"
+                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
+                    />
+                </div>
+
+                <div>
+                    <label className="text-sm font-bold text-foreground block mb-2">
+                        NFT Mint Account
+                    </label>
+                    <input
+                        type="text"
+                        name="nft_mint_account"
+                        value={withdrawalData.nft_mint_account}
+                        onChange={handleWithdrawalInputChange}
+                        placeholder="Enter NFT mint account"
+                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
+                    />
+                </div>
             </div>
 
-            <button className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl shadow-glow-primary transition-all text-lg cursor-pointer">
+            <button 
+                onClick={() => {
+                    submitWithdrawalState();
+                    // TODO: Add API call to confirm withdrawal here
+                }}
+                className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl shadow-glow-primary transition-all text-lg cursor-pointer"
+            >
                 Confirm Withdrawal
             </button>
         </div>

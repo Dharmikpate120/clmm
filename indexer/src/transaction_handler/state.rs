@@ -9,7 +9,7 @@ use solana_program::{
 
 pub const TICK_ARRAY_SIZE: u32 = 88;
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, Debug)]
 pub enum AMMAccount {
     Uninitialized,
     Initialized {
