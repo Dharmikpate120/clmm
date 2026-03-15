@@ -12,7 +12,7 @@ function parseU128(raw: string): number {
     const divisor = BigInt(2) ** BigInt(64)
     const intPart = Number(big / divisor)
     const fracPart = Number(big % divisor) / Number(divisor)
-    return intPart + fracPart
+    return (intPart + fracPart) * (intPart + fracPart)
   } catch {
     return 0
   }
@@ -23,6 +23,7 @@ function parseU32(raw: string): number {
 }
 
 function parseRawMarket(row: Record<string, string>): Market {
+  console.log("currentPrice", row.current_price, parseU128(row.current_price))
   return {
     id: row.id,
     market_address: row.market_address,

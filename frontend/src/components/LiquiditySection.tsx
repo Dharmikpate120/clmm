@@ -6,8 +6,9 @@ import RemoveIcon from "@mui/icons-material/Remove";
 import Modal from "@/components/Modal";
 import AddLiquidityModal from "@/components/modals/AddLiquidityModal";
 import WithdrawLiquidityModal from "@/components/modals/WithdrawLiquidityModal";
+import { Market } from "@/lib/types/market";
 
-export default function LiquiditySection() {
+export default function LiquiditySection({ market }: { market: Market }) {
     const [activeModal, setActiveModal] = useState<"add" | "withdraw" | null>(null);
 
     return (
@@ -15,14 +16,14 @@ export default function LiquiditySection() {
             <div className="grid grid-cols-2 gap-4">
                 <button
                     onClick={() => setActiveModal("add")}
-                    className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    className="px-4 py-2.5 bg-background border border-input rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 cursor-pointer"
                 >
                     <AddIcon />
                     Add Liquidity
                 </button>
                 <button
                     onClick={() => setActiveModal("withdraw")}
-                    className="flex items-center justify-center gap-2 bg-card hover:bg-muted/50 border border-border text-foreground font-bold py-4 px-6 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    className="px-4 py-2.5 bg-background border border-input rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 cursor-pointer"
                 >
                     <RemoveIcon />
                     Withdraw
@@ -34,7 +35,7 @@ export default function LiquiditySection() {
                 onClose={() => setActiveModal(null)}
                 title="Add Liquidity"
             >
-                <AddLiquidityModal />
+                <AddLiquidityModal market={market} />
             </Modal>
 
             <Modal
@@ -42,7 +43,7 @@ export default function LiquiditySection() {
                 onClose={() => setActiveModal(null)}
                 title="Withdraw Liquidity"
             >
-                <WithdrawLiquidityModal />
+                <WithdrawLiquidityModal market={market} />
             </Modal>
         </>
     );

@@ -27,12 +27,12 @@ export type AmmAddLiquidity = {
 export type AmmWithdrawLiquidity = {
   token_a_mint_account: string
   token_b_mint_account: string
+  amm_token_account: string
   provider_token_a_account: string
   provider_token_b_account: string
   minimum_liquidity: string
   provider_account: string
   nft_mint_account: string
-  provider_account: string
 }
 
 export type SwapTokens = {

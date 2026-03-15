@@ -24,11 +24,21 @@ const INITIAL_SWAP_STATE: SwapTokens = {
   swapper_account: "GK5uAKRv4Abn4szsDuhvcBDoYp8cwAcggkkynMjmSZf3",
 };
 
-export default function SwapCard() {
+import { Market } from "@/lib/types/market";
+
+export default function SwapCard({ market }: { market: Market }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [swapFormData, setSwapFormData] = useState<SwapTokens>(
-    INITIAL_SWAP_STATE
-  );
+  const [swapFormData, setSwapFormData] = useState<SwapTokens>({
+    token_a_mint_account: market.mint_address_a,
+    token_b_mint_account: market.mint_address_b,
+    swapper_token_a_account: "", 
+    swapper_token_b_account: "",
+    token_in_mint: market.mint_address_a,
+    token_out_mint: market.mint_address_b,
+    max_amount_in: "1",
+    minimum_amount_out: "20",
+    swapper_account: "",
+  });
 
   // Handler for all input changes
   const handleInputChange = (

@@ -252,11 +252,10 @@ export default function PoolList({ filters }: PoolListProps) {
                 <button
                   key={p}
                   onClick={() => goToPage(p as number)}
-                  className={`w-8 h-8 rounded-lg text-sm font-medium flex items-center justify-center transition-colors cursor-pointer ${
-                    page === p
-                      ? "bg-primary text-white"
-                      : "hover:bg-muted text-muted-foreground"
-                  }`}
+                  className={`px-4 py-2.5 bg-background border border-input rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 cursor-pointer ${page === p
+                    ? "bg-highlight text-white"
+                    : "hover:bg-muted text-muted-foreground"
+                    }`}
                 >
                   {p}
                 </button>

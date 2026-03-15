@@ -1,26 +1,127 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import { useWalletUi } from "@wallet-ui/react";
 import type { AmmWithdrawLiquidity } from "@/lib/types";
+import { Market } from "@/lib/types/market";
+import { Position, TokenAccount } from "@/lib/types/position";
 import withdrawLiquidity from "@/lib/actions/withdrawLiquidity";
+import { ellipsify } from "@/lib/utils";
+
+const TICK_BASE = 1.0001;
+
+function tickToPrice(tick: number): number {
+    return Math.pow(TICK_BASE, tick);
+}
 
 const initialWithdrawState: AmmWithdrawLiquidity = {
-    token_a_mint_account: "6rxGJAE7xLLSogfhLpnJNixbBoAAosNSn2KAVcuJKg8d",
-    token_b_mint_account: "FYAehxG1mMrVd5vftv72TdkKfjkj6VzwwmbfpCp6nxhY",
-    provider_token_a_account: "AXNfEoew1PRokiSCPzAAQunHJMP7jr1zSxPcFfi2zy8q",
-    provider_token_b_account: "Ds7GLgYzr2i3J4KFA4TPbFyJgFG2GwfSLvV1xYSbi96H",
-    minimum_liquidity: "100",
-    provider_account: "GK5uAKRv4Abn4szsDuhvcBDoYp8cwAcggkkynMjmSZf3",
-    nft_mint_account: "86Mmzwup1gymUkSdF4P8FwAjwVASQsPeQzRRCZHHt5dM",
+    token_a_mint_account: "",
+    token_b_mint_account: "",
+    amm_token_account: "",
+    provider_token_a_account: "",
+    provider_token_b_account: "",
+    minimum_liquidity: "0",
+    provider_account: "",
+    nft_mint_account: "",
 };
 
-export default function WithdrawLiquidityModal() {
-    const [step, setStep] = useState(2);
-    const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
+export default function WithdrawLiquidityModal({ market }: { market: Market }) {
+    const [step, setStep] = useState(1);
+    const { account } = useWalletUi();
+    const [positions, setPositions] = useState<Position[]>([]);
+    const [userTokenAccounts, setUserTokenAccounts] = useState<TokenAccount[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
     const [withdrawPercent, setWithdrawPercent] = useState(50);
-    const [withdrawalData, setWithdrawalData] = useState<AmmWithdrawLiquidity>(initialWithdrawState);
+    const [withdrawalData, setWithdrawalData] = useState<AmmWithdrawLiquidity>({
+        ...initialWithdrawState,
+        token_a_mint_account: market.mint_address_a,
+        token_b_mint_account: market.mint_address_b,
+        amm_token_account: market.market_address,
+        provider_account: account?.address || ""
+    });
+
+    useEffect(() => {
+        if (!account?.address) {
+            setLoading(false);
+            return;
+        }
+
+        const fetchData = async () => {
+            try {
+                // Fetch Positions
+                const posRes = await fetch(`/api/user/positions?user_address=${account?.address}&market_id=${market.id}`);
+                const posData = await posRes.json();
+                setPositions(posData.positions || []);
+
+                // Fetch Token Accounts
+                const tokenRes = await fetch(`/api/user/token-accounts?user_address=${account.address}`);
+                const tokenData = await tokenRes.json();
+                const accounts = tokenData.tokenAccounts || [];
+                setUserTokenAccounts(accounts);
+
+                // Auto-fill provider token accounts if possible
+                const accA = accounts.find((a: TokenAccount) => a.token_mint_address === market.mint_address_a);
+                const accB = accounts.find((a: TokenAccount) => a.token_mint_address === market.mint_address_b);
+
+                setWithdrawalData(prev => ({
+                    ...prev,
+                    amm_token_account: market.market_address,
+                    provider_token_a_account: accA?.token_address || "",
+                    provider_token_b_account: accB?.token_address || "",
+                    provider_account: account.address
+                }));
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [account?.address, market.id, market.mint_address_a, market.mint_address_b]);
+
+    useEffect(() => {
+        if (selectedPosition && account?.address) {
+            const amount = (selectedPosition.liquidity * (withdrawPercent / 100));
+            const accA = userTokenAccounts.find((a: TokenAccount) => a.token_mint_address === market.mint_address_a);
+            const accB = userTokenAccounts.find((a: TokenAccount) => a.token_mint_address === market.mint_address_b);
+
+            setWithdrawalData({
+                token_a_mint_account: market.mint_address_a,
+                token_b_mint_account: market.mint_address_b,
+                amm_token_account: market.market_address,
+                provider_token_a_account: accA?.token_address || "",
+                provider_token_b_account: accB?.token_address || "",
+                minimum_liquidity: amount.toFixed(4),
+                provider_account: account.address,
+                nft_mint_account: selectedPosition.nft_address,
+            });
+        }
+    }, [selectedPosition, withdrawPercent, account?.address, market, userTokenAccounts]);
+
+    const handleLiquidityAmountChange = (val: string) => {
+        if (!selectedPosition) return;
+        const numVal = parseFloat(val) || 0;
+        const clampedVal = Math.min(Math.max(numVal, 0), selectedPosition.liquidity);
+
+        setWithdrawalData(prev => ({
+            ...prev,
+            minimum_liquidity: clampedVal.toString()
+        }));
+
+        if (selectedPosition.liquidity > 0) {
+            setWithdrawPercent(Math.round((clampedVal / selectedPosition.liquidity) * 100));
+        }
+    };
+
+    const adjustLiquidity = (delta: number) => {
+        const current = parseFloat(withdrawalData.minimum_liquidity) || 0;
+        handleLiquidityAmountChange((current + delta).toString());
+    };
 
     const handleWithdrawalInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -30,7 +131,7 @@ export default function WithdrawLiquidityModal() {
         }));
     };
 
-    const submitWithdrawalState =async () => {
+    const submitWithdrawalState = async () => {
         const instruction = await withdrawLiquidity(withdrawalData);
         console.log(instruction);
         setWithdrawalData(initialWithdrawState);
@@ -43,79 +144,83 @@ export default function WithdrawLiquidityModal() {
                 <div className="bg-muted/50 p-4 rounded-xl mb-4">
                     <input
                         className="w-full bg-transparent focus:outline-none text-foreground"
-                        placeholder="Search by ID..."
+                        placeholder="Search by ID or Address..."
                         type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                     <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">
-                        Your Positions (2)
+                        Your Positions ({positions.length})
                     </h4>
-                    <div
-                        className={`border rounded-xl p-4 cursor-pointer transition-all ${selectedPosition === "291"
-                            ? "border-primary bg-primary/5 dark:bg-primary/10"
-                            : "border-border hover:border-input"
-                            }`}
-                        onClick={() => setSelectedPosition("291")}
-                    >
-                        <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-xs">
-                                    #291
-                                </div>
-                                <span className="font-bold text-foreground">
-                                    SOL-USDC
-                                </span>
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                                    In Range
-                                </span>
-                            </div>
-                            <div className="text-right">
-                                <div className="font-bold text-foreground">
-                                    $1,248.52
-                                </div>
-                                <div className="text-xs text-secondary">+$12.48 Fees</div>
-                            </div>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-500 font-mono">
-                            <span>Min: $138.2</span>
-                            <span>Max: $148.5</span>
-                        </div>
-                    </div>
 
-                    <div
-                        className={`border rounded-xl p-4 cursor-pointer transition-all ${selectedPosition === "184"
-                            ? "border-primary bg-primary/5 dark:bg-primary/10"
-                            : "border-border hover:border-input"
-                            }`}
-                        onClick={() => setSelectedPosition("184")}
-                    >
-                        <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground font-bold text-xs">
-                                    #184
-                                </div>
-                                <span className="font-bold text-foreground">
-                                    SOL-USDC
-                                </span>
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
-                                    Out of Range
-                                </span>
-                            </div>
-                            <div className="text-right">
-                                <div className="font-bold text-foreground">
-                                    $542.10
-                                </div>
-                                <div className="text-xs text-secondary">+$4.20 Fees</div>
-                            </div>
+                    {loading ? (
+                        <div className="text-center py-8 text-muted-foreground animate-pulse">Loading positions...</div>
+                    ) : positions.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border">
+                            No active positions found in this market.
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500 font-mono">
-                            <span>Min: $120.0</span>
-                            <span>Max: $135.0</span>
-                        </div>
-                    </div>
+                    ) : (
+                        positions
+                            .filter(pos =>
+                                pos.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                pos.position_address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                pos.nft_address.toLowerCase().includes(searchQuery.toLowerCase())
+                            )
+                            .map((pos) => {
+                                const isInRange = market.current_tick >= pos.start_tick && market.current_tick <= pos.end_tick;
+                                const minPrice = tickToPrice(pos.start_tick);
+                                const maxPrice = tickToPrice(pos.end_tick);
+
+                                return (
+                                    <div
+                                        key={pos.id}
+                                        className={`border rounded-xl p-4 cursor-pointer transition-all ${selectedPosition?.id === pos.id
+                                            ? "border-primary bg-primary/5 dark:bg-primary/10 shadow-sm"
+                                            : "border-border hover:border-input bg-card/50"
+                                            }`}
+                                        onClick={() => setSelectedPosition(pos)}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-[10px] ${isInRange ? "bg-gradient-to-br from-primary to-secondary" : "bg-muted text-muted-foreground"}`}>
+                                                    NFT
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-foreground text-sm">
+                                                        {ellipsify(pos.position_address)}
+                                                    </div>
+                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 w-fit mt-1 ${isInRange
+                                                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                                        : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                                        }`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${isInRange ? "bg-green-500" : "bg-yellow-500"}`}></span>
+                                                        {isInRange ? "In Range" : "Out of Range"}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-bold text-foreground font-mono">
+                                                    {pos.liquidity.toFixed(2)} Liq
+                                                </div>
+                                                <div className="text-[10px] text-muted-foreground font-mono">#{ellipsify(pos.id, 3)}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between text-[11px] text-gray-500 font-mono mt-3 pt-3 border-t border-border/50">
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] uppercase font-bold text-muted-foreground/60 mb-0.5">Min Price</span>
+                                                <span className="text-foreground">${minPrice.toFixed(3)}</span>
+                                            </div>
+                                            <div className="flex flex-col text-right">
+                                                <span className="text-[9px] uppercase font-bold text-muted-foreground/60 mb-0.5">Max Price</span>
+                                                <span className="text-foreground">${maxPrice.toFixed(3)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                    )}
                 </div>
 
                 <button
@@ -135,16 +240,19 @@ export default function WithdrawLiquidityModal() {
     // Step 2: Confirm & Amount
     return (
         <div className="space-y-6">
-            {/* <div className="bg-muted/50 rounded-xl p-4 border border-border flex items-center justify-between">
+            <div className="bg-muted/50 rounded-xl p-4 border border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold">
-                        #{selectedPosition}
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-xs">
+                        NFT
                     </div>
                     <div>
                         <div className="font-bold text-foreground">
-                            SOL-USDC Position
+                            {ellipsify(selectedPosition?.position_address)}
                         </div>
-                        <div className="text-xs text-gray-500">Min: $138.2 • Max: $148.5</div>
+                        <div className="text-xs text-gray-500 font-mono">
+                            Total Liq: <span className="text-foreground font-bold">{selectedPosition?.liquidity.toFixed(4)}</span>
+                        </div>
+                        <div className="text-[10px] text-gray-400">Min: ${tickToPrice(selectedPosition?.start_tick || 0).toFixed(2)} • Max: ${tickToPrice(selectedPosition?.end_tick || 0).toFixed(2)}</div>
                     </div>
                 </div>
                 <button
@@ -153,174 +261,70 @@ export default function WithdrawLiquidityModal() {
                 >
                     Change
                 </button>
-            </div> */}
+            </div>
 
-            {/* <div className="space-y-2">
-                <div className="flex justify-between">
-                    <label className="text-sm font-bold text-foreground">
+            <div className="bg-muted/30 rounded-xl p-6 border border-border space-y-4">
+                <div className="flex justify-between items-center">
+                    <label className="text-sm font-bold text-foreground uppercase tracking-wider">
                         Withdraw Amount
                     </label>
-                    <span className="text-sm font-bold text-primary">{withdrawPercent}%</span>
-                </div>
-                <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={withdrawPercent}
-                    onChange={(e) => setWithdrawPercent(Number(e.target.value))}
-                    className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-                />
-                <div className="flex justify-between text-xs text-gray-500">
-                    <button onClick={() => setWithdrawPercent(25)} className="hover:text-primary cursor-pointer">25%</button>
-                    <button onClick={() => setWithdrawPercent(50)} className="hover:text-primary cursor-pointer">50%</button>
-                    <button onClick={() => setWithdrawPercent(75)} className="hover:text-primary cursor-pointer">75%</button>
-                    <button onClick={() => setWithdrawPercent(100)} className="hover:text-primary cursor-pointer">Max</button>
-                </div>
-            </div> */}
-
-            {/* <div className="bg-muted/50 rounded-xl p-4 border border-border space-y-3">
-                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    You Receive
-                </h4>
-                <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                        <img
-                            alt="SOL"
-                            className="w-6 h-6 rounded-full"
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrETAEdMSL3H499w94eluhcBFBsEKq6H4oIZhYfLaSHiYOMv81BQbHAy6PZ7aey9kD_UpolsmVdUdpfKoTz3OptcGWc4ijucd8WnhH0n2fJnwzYRwdZOUjdqrkbW_w7QXSsMIqFy5u2OM0Ff-_mT5HIVQ-bqlg1u_vzGWvOxSiLYr7Z816Y4IFIAHyZYDtNcIg1tciD8OEab2BjraEulEnwlk4s317vYzlPfis28uXg7B1CYqpILSnICDXLQr1DJmPF_rCEqc0OI0"
-                        />
-                        <span className="font-bold text-foreground">
-                            1.20 SOL
-                        </span>
+                        <span className="text-xs text-muted-foreground mr-2">{withdrawPercent}% of total</span>
+                        <div className="flex items-center bg-card rounded-lg border border-border overflow-hidden">
+                            <button
+                                onClick={() => adjustLiquidity(-1)}
+                                className="px-3 py-2 hover:bg-muted text-foreground transition-colors"
+                            >
+                                -
+                            </button>
+                            <input
+                                type="text"
+                                value={withdrawalData.minimum_liquidity}
+                                onChange={(e) => handleLiquidityAmountChange(e.target.value)}
+                                className="w-24 bg-transparent text-center font-mono font-bold text-foreground focus:outline-none border-x border-border"
+                            />
+                            <button
+                                onClick={() => adjustLiquidity(1)}
+                                className="px-3 py-2 hover:bg-muted text-foreground transition-colors"
+                            >
+                                +
+                            </button>
+                        </div>
                     </div>
-                    <div className="font-mono text-gray-500">~$171.60</div>
                 </div>
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <img
-                            alt="USDC"
-                            className="w-6 h-6 rounded-full"
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxwkXGm9PHXmlFjOlqHsxu0zI_SEniw76tPKnm4KkYgtuxAc2_9YpDOr2SSBo2jGKK8FG7h150SpojXCwqP2jDhl03QlyhhnOqDpw4tgW1ASM3YQF0nVqaspCyMSo6LrC6AEaP2cZBhijYn9Sj_6qwY8ptexThUX725a3IHt9Y3-kag9n0dT1TPehsMK4XHg-czD-ZfYjq5EH9R7p-sO-mjO5TkJop9rJFeemFhmz9kxjn8oi_QjvivQGYMkAw4WavVNdW081DlGM"
-                        />
-                        <span className="font-bold text-foreground">
-                            521.40 USDC
-                        </span>
+
+                <div className="space-y-3">
+                    <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={withdrawPercent}
+                        onChange={(e) => setWithdrawPercent(Number(e.target.value))}
+                        className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+                    <div className="flex justify-between text-[10px] font-bold text-gray-400">
+                        <button onClick={() => setWithdrawPercent(0)} className="hover:text-primary transition-colors">0%</button>
+                        <button onClick={() => setWithdrawPercent(25)} className="hover:text-primary transition-colors">25%</button>
+                        <button onClick={() => setWithdrawPercent(50)} className="hover:text-primary transition-colors">50%</button>
+                        <button onClick={() => setWithdrawPercent(75)} className="hover:text-primary transition-colors">75%</button>
+                        <button onClick={() => setWithdrawPercent(100)} className="hover:text-primary transition-colors uppercase">Max</button>
                     </div>
-                    <div className="font-mono text-gray-500">~$521.40</div>
-                </div>
-                <div className="pt-3 border-t border-border flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <span className="text-secondary text-sm font-bold">Unclaimed Fees</span>
-                    </div>
-                    <div className="font-mono text-foreground font-bold">~$6.24</div>
-                </div>
-            </div> */}
-
-            <div className="space-y-4 bg-muted/30 rounded-xl p-4 border border-border">
-                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    Withdrawal Details
-                </h4>
-                
-                <div>
-                    <label className="text-sm font-bold text-foreground block mb-2">
-                        Token A Mint Account
-                    </label>
-                    <input
-                        type="text"
-                        name="token_a_mint_account"
-                        value={withdrawalData.token_a_mint_account}
-                        onChange={handleWithdrawalInputChange}
-                        placeholder="Enter token A mint account"
-                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
-                    />
-                </div>
-
-                <div>
-                    <label className="text-sm font-bold text-foreground block mb-2">
-                        Token B Mint Account
-                    </label>
-                    <input
-                        type="text"
-                        name="token_b_mint_account"
-                        value={withdrawalData.token_b_mint_account}
-                        onChange={handleWithdrawalInputChange}
-                        placeholder="Enter token B mint account"
-                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
-                    />
-                </div>
-
-                <div>
-                    <label className="text-sm font-bold text-foreground block mb-2">
-                        Provider Token A Account
-                    </label>
-                    <input
-                        type="text"
-                        name="provider_token_a_account"
-                        value={withdrawalData.provider_token_a_account}
-                        onChange={handleWithdrawalInputChange}
-                        placeholder="Enter provider token A account"
-                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
-                    />
-                </div>
-
-                <div>
-                    <label className="text-sm font-bold text-foreground block mb-2">
-                        Provider Token B Account
-                    </label>
-                    <input
-                        type="text"
-                        name="provider_token_b_account"
-                        value={withdrawalData.provider_token_b_account}
-                        onChange={handleWithdrawalInputChange}
-                        placeholder="Enter provider token B account"
-                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
-                    />
-                </div>
-
-                <div>
-                    <label className="text-sm font-bold text-foreground block mb-2">
-                        Minimum Liquidity
-                    </label>
-                    <input
-                        type="text"
-                        name="minimum_liquidity"
-                        value={withdrawalData.minimum_liquidity}
-                        onChange={handleWithdrawalInputChange}
-                        placeholder="Enter minimum liquidity"
-                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
-                    />
-                </div>
-
-                <div>
-                    <label className="text-sm font-bold text-foreground block mb-2">
-                        Provider Account
-                    </label>
-                    <input
-                        type="text"
-                        name="provider_account"
-                        value={withdrawalData.provider_account}
-                        onChange={handleWithdrawalInputChange}
-                        placeholder="Enter provider account"
-                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
-                    />
-                </div>
-
-                <div>
-                    <label className="text-sm font-bold text-foreground block mb-2">
-                        NFT Mint Account
-                    </label>
-                    <input
-                        type="text"
-                        name="nft_mint_account"
-                        value={withdrawalData.nft_mint_account}
-                        onChange={handleWithdrawalInputChange}
-                        placeholder="Enter NFT mint account"
-                        className="w-full bg-muted/50 text-foreground placeholder-gray-500 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary transition-colors"
-                    />
                 </div>
             </div>
 
-            <button 
+            <div className="bg-muted/30 rounded-xl p-4 border border-border flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <VerifiedIcon className="text-primary" fontSize="inherit" />
+                    <span>Transaction will be signed by your connected wallet</span>
+                </div>
+                <div className="text-[10px] font-mono text-muted-foreground">
+                    {ellipsify(account?.address, 4)}
+                </div>
+            </div>
+
+
+
+            <button
                 onClick={() => {
                     submitWithdrawalState();
                     // TODO: Add API call to confirm withdrawal here

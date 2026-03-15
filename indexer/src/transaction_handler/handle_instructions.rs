@@ -81,7 +81,8 @@ pub async fn handle_initialize_token_pool(
         position_account,
         pubkeys[0],
         pubkeys[1],
-        pubkeys[14]
+        pubkeys[14],
+        pubkeys[9]
     ).await?;
 
     //handling user token addressses
@@ -154,7 +155,8 @@ pub async fn handle_add_liquidity(
         position_account,
         pubkeys[0],
         pubkeys[1],
-        pubkeys[13]
+        pubkeys[13],
+        pubkeys[2]
     ).await?;
 
     //handling tick array accounts

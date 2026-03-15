@@ -13,10 +13,17 @@ import { useWalletUiSignAndSend } from '@wallet-ui/react-gill'
 import type { PoolListFilters } from '@/components/home/PoolList'
 
 const initialState = {
+  /* 
+ spl-token create-token --decimals 0
+ */
   token_a_mint_account: '6rxGJAE7xLLSogfhLpnJNixbBoAAosNSn2KAVcuJKg8d',
-  token_b_mint_account: 'FYAehxG1mMrVd5vftv72TdkKfjkj6VzwwmbfpCp6nxhY',
+  token_b_mint_account: 'GRibpkhgcvbqqBVLWZNgfeQwZhCry9f82XQDUVXG7FcG',
+  /* 
+spl-token create-account GRibpkhgcvbqqBVLWZNgfeQwZhCry9f82XQDUVXG7FcG
+spl-token mint GRibpkhgcvbqqBVLWZNgfeQwZhCry9f82XQDUVXG7FcG 200000 -- 9VMQcA61hKgDLRYCerqjFf5HvXUPVx77bVPxoSCWZ6hv
+*/
   admin_token_a_account: 'AXNfEoew1PRokiSCPzAAQunHJMP7jr1zSxPcFfi2zy8q',
-  admin_token_b_account: 'Ds7GLgYzr2i3J4KFA4TPbFyJgFG2GwfSLvV1xYSbi96H',
+  admin_token_b_account: '9VMQcA61hKgDLRYCerqjFf5HvXUPVx77bVPxoSCWZ6hv',
   token_a_amount: '10000',
   token_b_amount: '1000',
   start_tick: '22000',
@@ -143,7 +150,7 @@ export default function SubHeader({ filters, onFiltersChange }: SubHeaderProps) 
 
         {/* Create Pool */}
         <button
-          className="px-4 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium shadow-glow-primary transition-all flex items-center gap-2 cursor-pointer"
+          className="px-4 py-2.5 bg-background border border-input rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 cursor-pointer"
           onClick={() => setOpenModal(true)}
         >
           <AddIcon fontSize="small" />

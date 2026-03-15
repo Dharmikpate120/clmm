@@ -1,6 +1,9 @@
 "use client";
 
-export default function PoolHeader() {
+import { Market } from "@/lib/types/market";
+import { ellipsify } from "@/lib/utils";
+
+export default function PoolHeader({ market }: { market: Market }) {
     return (
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div className="flex items-center gap-4">
@@ -19,15 +22,16 @@ export default function PoolHeader() {
                 <div>
                     <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
                         SOL - USDC
-                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-primary/20 text-primary border border-primary/20">
-                            0.05%
-                        </span>
                     </h1>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="bg-muted px-2 py-0.5 rounded text-xs">
-                            Concentrated
-                        </span>
-                        <span>Fee Tier: 0.05%</span>
+                    <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3 text-sm text-muted-foreground mt-1">
+                        <div className="flex items-center gap-1">
+                            <span className="text-xs">Mint A:</span>
+                            <span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">{ellipsify(market.mint_address_a)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <span className="text-xs">Mint B:</span>
+                            <span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">{ellipsify(market.mint_address_b)}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -36,14 +40,14 @@ export default function PoolHeader() {
                     <div className="text-xs text-muted-foreground">
                         Current Price
                     </div>
-                    <div className="text-xl font-mono font-bold text-foreground">$143.25</div>
+                    <div className="text-xl font-mono font-bold text-foreground">${market.current_price.toFixed(4)}</div>
                 </div>
                 <div className="text-right">
                     <div className="text-xs text-muted-foreground">
-                        24h Change
+                        Fee Tier
                     </div>
-                    <div className="text-xl font-mono font-bold text-secondary">
-                        +2.15%
+                    <div className="text-xl font-mono font-bold text-primary">
+                        0.05%
                     </div>
                 </div>
             </div>

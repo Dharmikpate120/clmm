@@ -55,7 +55,8 @@ pub struct DbPositionAccount{
     pub start_tick: String,
     pub end_tick: String,
     pub liquidity: String,
-    pub position_address: Option<String>
+    pub position_address: Option<String>,
+    pub market_id: Option<Uuid>
 
 }
 pub async fn handle_create_token_account(
@@ -154,7 +155,8 @@ pub async fn create_token_pool_account(
     } else {
         token_a_address = data_b.mint;
         token_b_address = data_a.mint;
-    }
+    }   
+    println!("in create token pool account");
 
     // here the address needs to be stored in canonical order in db other wise it won't work and the addresses passed also needs to be in canonical order
     let market: Market = sqlx
@@ -233,9 +235,17 @@ pub async fn handle_create_position_account(
     position_account: Account,
     user_address: Address,
     nft_address: Address,
-    position_address: Address
+    position_address: Address,
+    market_address: Address
 ) -> anyhow::Result<()> {
     let db: &sqlx::Pool<sqlx::Postgres> = get_pg().await;
+    println!("market address: {:?}", market_address.to_string());
+    let market_data = sqlx::query_as!(
+        Market, 
+        "SELECT * FROM markets WHERE market_address = $1;", 
+        market_address.to_string()
+    ).fetch_one(db).await?;
+    println!("market data: {:?}", market_data);
     let position_data: PositionAccount = PositionAccount::unpack_from_slice(
         &position_account.data
     )?;
@@ -254,13 +264,14 @@ pub async fn handle_create_position_account(
             temp_liq *=temp_liq;
             let _ = sqlx
                 ::query!(
-                    "INSERT INTO position_accounts VALUES (DEFAULT, $1, $2, $3, $4, $5, $6)",
+                    "INSERT INTO position_accounts VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7)",
                     user_data.id.to_string(),
                     nft_address.to_string(),
                     start_tick.to_string(),
                     end_tick.to_string(),
                     temp_liq.to_string(),
-                    position_address.to_string()
+                    position_address.to_string(),
+                    market_data.id
                 )
                 .execute(db).await;
         }
@@ -325,9 +336,9 @@ pub async fn create_user_token_account(
     let db: &sqlx::Pool<sqlx::Postgres> = get_pg().await;
 
     let user_token_data = spl_token_interface::state::Account::unpack(&user_token_account.data)?;
-
+    println!("create_user_token_account user address & token mint addr: {:?}, {:?}", user_address.to_string(), user_token_data.mint.to_string());
     let user_token_data_db = sqlx::query_as!(UserToken, "SELECT * FROM user_token_accounts WHERE user_address = $1 AND token_mint_address = $2;", user_address.to_string(), user_token_data.mint.to_string()).fetch_optional(db).await?;
-
+    println!("create_user_token_account user token data db: {:?}", user_token_data_db);
     match user_token_data_db{
         Some(_)=> {
             let _ = sqlx::query!(
@@ -387,20 +398,22 @@ pub async fn handle_create_active_tick(
     println!("active tick data: {:?}", data);
     let net_liquidity = data[tick_tail as usize];
     println!("tick_tail: {:?}, {:?}, {:?}", tick_tail, tick_index, net_liquidity);
-    
+    println!("handle_create_active_tick market address: {:?}", market_address.to_string());
     let market = sqlx::query_as!(
         Market, 
         "SELECT * FROM markets WHERE market_address = $1;", 
         market_address.to_string()
     ).fetch_one(db).await?;
+    println!("handle_create_active_tick market data: {:?}", market);
 
+    println!("handle_create_active_tick tick index: {:?}, tick_index: {:?}", market.id, tick_index);
     let active_tick = sqlx::query_as!(
         ActiveTick, 
         "SELECT * FROM active_ticks where market_id = $1 AND tick_position = $2;", 
         market.id, 
         tick_index as i32
     ).fetch_optional(db).await?;
-    
+    println!("handle_create_active_tick active tick: {:?}", active_tick);
     match active_tick{
         Some(tick) =>{
             let _ = sqlx::query!(

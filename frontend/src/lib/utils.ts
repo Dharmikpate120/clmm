@@ -24,7 +24,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function ellipsify(str = '', len = 4, delimiter = '..') {
-  const strLen = str.length
+  const strLen = str?.length
   const limit = len * 2 + delimiter.length
 
   return strLen >= limit ? str.substring(0, len) + delimiter + str.substring(strLen - len, strLen) : str
@@ -132,8 +132,8 @@ export function clmm_token_account_decoder(data: Base64EncodedBytes): clmmTokenA
   return decoder.decode(u8_data.subarray(1, u8_data.length));
 }
 
-export function price_to_tick_index(price:bigint): number{
-  return Math.log(Number(price))/Math.log(1.001)
+export function price_to_tick_index(price: bigint): number {
+  return Math.log(Number(price)) / Math.log(1.0001)
 }
 
 // export async function
