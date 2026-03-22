@@ -1,56 +1,32 @@
-'use server'
 import {
   AccountMeta,
   AccountRole,
   AccountSignerMeta,
   address,
-  appendTransactionMessageInstruction,
-  BaseTransactionMessage,
-  compileTransactionMessage,
-  createKeyPairFromBytes,
-  createKeyPairSignerFromBytes,
   createSolanaClient,
-  createTransaction,
-  createTransactionMessage,
   getAddressCodec,
   getAddressEncoder,
-  getBase64Decoder,
-  getBase64EncodedWireTransaction,
-  getBase64Encoder,
-  getEnumCodec,
   getProgramDerivedAddress,
   getStructCodec,
   getU64Codec,
   Instruction,
-  pipe,
-  sendAndConfirmTransactionFactory,
-  setTransactionMessageFeePayer,
-  setTransactionMessageLifetimeUsingBlockhash,
-  signTransaction,
-  signTransactionMessageWithSigners,
-  TransactionMessageWithFeePayer,
-  TransactionSigner,
 } from 'gill'
-import bs58 from 'bs58'
 import { clmmTokenAccountType, SwapTokens } from '../types'
-import * as borsh from 'borsh'
 import { clmm_token_account_decoder, get_lexicographical_token_pda, get_lexicographical_tokens_addresses } from '../utils'
-import { error } from 'console'
 
 export default async function swapTokens(data: SwapTokens) {
-  'use server'
+  // 'use server'
   try {
     // if (data.provider_account !== process.env.ADMIN_ACCOUNT) {
     //     return { error: 'Unauthorized' }
     // }
 
-    const { rpc, rpcSubscriptions } = createSolanaClient({ urlOrMoniker: 'devnet' })
+    const { rpc } = createSolanaClient({ urlOrMoniker: 'devnet' })
 
     const [clmm_token_account_pda] =await getProgramDerivedAddress({
-      programAddress: address(process.env.AMM_PROGRAM_ADDRESS!),
+      programAddress: address("DjTMdzPyaS4G2Kxa6iyFbckzbtwzL6y66Wawo6WqfTRu"),
       seeds:await get_lexicographical_tokens_addresses(address(data.token_a_mint_account), address(data.token_b_mint_account), [])
     });
-    console.log("pda: ", clmm_token_account_pda)
     const clmm_token_account = await rpc.getAccountInfo(clmm_token_account_pda, {encoding: "base64"}).send();
     let decoded_token_data;
     if (clmm_token_account.value?.data){
@@ -65,10 +41,10 @@ const addressEncoder = getAddressCodec();
     const [amm_token_account_address] = await get_lexicographical_token_pda(
     address(data.token_a_mint_account),
     address(data.token_b_mint_account),
-    address(process.env.AMM_PROGRAM_ADDRESS!),
+    address("DjTMdzPyaS4G2Kxa6iyFbckzbtwzL6y66Wawo6WqfTRu"),
   )
   const [bitmap_account_one_pda] = await getProgramDerivedAddress({
-    programAddress:address(process.env.AMM_PROGRAM_ADDRESS!),
+    programAddress:address("DjTMdzPyaS4G2Kxa6iyFbckzbtwzL6y66Wawo6WqfTRu"),
     seeds:["bitmap", bitmap_index_one, addressEncoder.encode(amm_token_account_address) ]
   })
   const bitmap_account_data = await rpc.getAccountInfo(bitmap_account_one_pda, {encoding: "base64"}).send();
@@ -93,8 +69,8 @@ const addressEncoder = getAddressCodec();
     const createAmmData = codec.encode({
       amount_in: parseInt(data.max_amount_in),
       minimum_amount_out: parseInt(data.minimum_amount_out),
-      mint_address_in: address(data.token_a_mint_account),
-      mint_address_out: address(data.token_b_mint_account),
+      mint_address_in: address(data.token_in_mint),
+      mint_address_out: address(data.token_out_mint),
     })
 
     const finalAmmData = new Uint8Array(1 + createAmmData.length)
@@ -105,75 +81,80 @@ const addressEncoder = getAddressCodec();
     const createAmmInstruction: Instruction = {
       accounts: createAmmAccounts,
       data: finalAmmData,
-      programAddress: address(process.env.AMM_PROGRAM_ADDRESS!),
+      programAddress: address("DjTMdzPyaS4G2Kxa6iyFbckzbtwzL6y66Wawo6WqfTRu"),
     }
-    // return createAmmInstruction;
-    const { value: blockhash } = await rpc.getLatestBlockhash().send()
-    // const baseTx = createTransaction({ version: 0 })
-    const createAmmTransaction = pipe(
-      createTransactionMessage({ version: 'legacy' }),
-      (tx) => setTransactionMessageFeePayer(address(data.swapper_account), tx),
-      (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
-      (tx) => appendTransactionMessageInstruction(createAmmInstruction, tx),
-    )
+    return createAmmInstruction;
+    // const { value: blockhash } = await rpc.getLatestBlockhash().send()
+    // // const baseTx = createTransaction({ version: 0 })
+    // const createAmmTransaction = pipe(
+    //   createTransactionMessage({ version: 'legacy' }),
+    //   (tx) => setTransactionMessageFeePayer(address(data.swapper_account), tx),
+    //   (tx) => setTransactionMessageLifetimeUsingBlockhash(blockhash, tx),
+    //   (tx) => appendTransactionMessageInstruction(
+    //     getSetComputeUnitLimitInstruction({
+    //       units: 400000
+    //     }),tx),
+    //   (tx) => appendTransactionMessageInstruction(createAmmInstruction, tx),
+    //   // (tx) => computeunit
+    // )
 
-    // const compiledTransactionMessage = compileTransactionMessage(createAmmTransaction)
-    //  as BaseTransactionMessage & TransactionMessageWithFeePayer;
-    // const basetx = getbasetransactio
-    // import { createSolanaRpcSubscriptions, address } from '@solana/kit';
+    // // const compiledTransactionMessage = compileTransactionMessage(createAmmTransaction)
+    // //  as BaseTransactionMessage & TransactionMessageWithFeePayer;
+    // // const basetx = getbasetransactio
+    // // import { createSolanaRpcSubscriptions, address } from '@solana/kit';
 
-    // const rpcSubscriptions = createSolanaRpcSubscriptions('wss://api.mainnet-beta.solana.com');
-    const myAddress = address(data.swapper_account)
-    const abortController = new AbortController()
+    // // const rpcSubscriptions = createSolanaRpcSubscriptions('wss://api.mainnet-beta.solana.com');
+    // const myAddress = address(data.swapper_account)
+    // const abortController = new AbortController()
 
-    async function subscribeToAccount() {
-      const notifications = await rpcSubscriptions
-        .accountNotifications(myAddress, { commitment: 'confirmed' })
-        .subscribe({ abortSignal: abortController.signal })
+    // async function subscribeToAccount() {
+    //   const notifications = await rpcSubscriptions
+    //     .accountNotifications(myAddress, { commitment: 'confirmed' })
+    //     .subscribe({ abortSignal: abortController.signal })
 
-      // The loop waits for new notifications automatically
-      for await (const notification of notifications) {
-        console.log('Account Updated! New balance:', notification.value.lamports)
-        console.log('Slot:', notification.context.slot)
-      }
-    }
-    async function subscribeToTransactions() {
-      const logSubscription = await rpcSubscriptions
-        .logsNotifications({ mentions: [myAddress] }, { commitment: 'confirmed' })
-        .subscribe({ abortSignal: abortController.signal })
+    //   // The loop waits for new notifications automatically
+    //   for await (const notification of notifications) {
+    //     console.log('Account Updated! New balance:', notification.value.lamports)
+    //     console.log('Slot:', notification.context.slot)
+    //   }
+    // }
+    // async function subscribeToTransactions() {
+    //   const logSubscription = await rpcSubscriptions
+    //     .logsNotifications({ mentions: [myAddress] }, { commitment: 'confirmed' })
+    //     .subscribe({ abortSignal: abortController.signal })
 
-      for await (const log of logSubscription) {
-        console.log('Transaction detected!')
-        console.log('Signature:', log.value.signature)
-        console.log('Logs:', log.value.logs)
+    //   for await (const log of logSubscription) {
+    //     console.log('Transaction detected!')
+    //     console.log('Signature:', log.value.signature)
+    //     console.log('Logs:', log.value.logs)
 
-        if (log.value.err) {
-          console.error('Transaction failed:', log.value.err)
-        }
-      }
-    }
-    subscribeToAccount()
-    subscribeToTransactions()
-    // signTransaction([admin], compiledTransactionMessage)
-    // const compiledTx = compileTransactionMessage(createAmmTransaction)
-    // return compiledTx;
-    const signedTx = await signTransactionMessageWithSigners(createAmmTransaction)
-    const encoder64 = getBase64EncodedWireTransaction(signedTx)
-    // const msg = encoder64.decode(sig)
-    const simulated = await rpc
-      .simulateTransaction(encoder64, {
-        encoding: 'base64',
-        commitment: 'confirmed',
-      })
-      .send()
-    console.log(simulated.value.logs)
-    const sendAndConfirmTransaction = sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions })
-    console.log(signedTx)
-    const signature = await sendAndConfirmTransaction(signedTx, { commitment: 'confirmed' })
-    console.log(signature)
-    // const { value: signature } = await factory(compiledTransactionMessage).send();
-    // return { instruction: createAmmInstruction }
-    abortController.abort()
+    //     if (log.value.err) {
+    //       console.error('Transaction failed:', log.value.err)
+    //     }
+    //   }
+    // }
+    // subscribeToAccount()
+    // subscribeToTransactions()
+    // // signTransaction([admin], compiledTransactionMessage)
+    // // const compiledTx = compileTransactionMessage(createAmmTransaction)
+    // // return compiledTx;
+    // const signedTx = await signTransactionMessageWithSigners(createAmmTransaction)
+    // const encoder64 = getBase64EncodedWireTransaction(signedTx)
+    // // const msg = encoder64.decode(sig)
+    // const simulated = await rpc
+    //   .simulateTransaction(encoder64, {
+    //     encoding: 'base64',
+    //     commitment: 'confirmed',
+    //   })
+    //   .send()
+    // console.log(simulated.value.logs)
+    // const sendAndConfirmTransaction = sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions })
+    // console.log(signedTx)
+    // const signature = await sendAndConfirmTransaction(signedTx, { commitment: 'confirmed' })
+    // console.log(signature)
+    // // const { value: signature } = await factory(compiledTransactionMessage).send();
+    // // return { instruction: createAmmInstruction }
+    // abortController.abort()
   } catch (err) {
     console.log(err)
   }
@@ -183,17 +164,10 @@ async function AmmaccountsCreator(data: SwapTokens, decoded_token_data: clmmToke
   const addressEncoder = getAddressEncoder()
 
   //0. swapper_account(signer, writable)
-  const admin = await createKeyPairSignerFromBytes(
-    new Uint8Array([
-      10, 92, 27, 184, 114, 49, 64, 68, 52, 212, 240, 162, 153, 140, 141, 89, 87, 248, 49, 41, 56, 143, 73, 183, 89,
-      195, 22, 183, 89, 59, 194, 35, 227, 129, 76, 82, 217, 163, 19, 224, 13, 216, 217, 51, 54, 111, 34, 248, 164, 178,
-      79, 111, 66, 116, 188, 189, 132, 117, 72, 191, 89, 77, 133, 134,
-    ]),
-  )
   accounts.push({
-    address: address(admin.address),
+    address: address(data.swapper_account),
     // address: address(data.swapper_account),
-    signer: admin,
+    // signer: admin,
     role: AccountRole.WRITABLE_SIGNER,
   })
 
@@ -207,7 +181,7 @@ async function AmmaccountsCreator(data: SwapTokens, decoded_token_data: clmmToke
   const [amm_token_account_address] = await get_lexicographical_token_pda(
     address(data.token_a_mint_account),
     address(data.token_b_mint_account),
-    address(process.env.AMM_PROGRAM_ADDRESS!),
+    address("DjTMdzPyaS4G2Kxa6iyFbckzbtwzL6y66Wawo6WqfTRu"),
   )
   accounts.push({
     address: address(amm_token_account_address),
@@ -215,7 +189,7 @@ async function AmmaccountsCreator(data: SwapTokens, decoded_token_data: clmmToke
   })
   //3. amm_token_a_pool_account(writable)
   const [token_a_pool_account_address] = await getProgramDerivedAddress({
-    programAddress: address(process.env.AMM_PROGRAM_ADDRESS!),
+    programAddress: address("DjTMdzPyaS4G2Kxa6iyFbckzbtwzL6y66Wawo6WqfTRu"),
     seeds: [
       'pool',
       addressEncoder.encode(address(amm_token_account_address)),
@@ -229,7 +203,7 @@ async function AmmaccountsCreator(data: SwapTokens, decoded_token_data: clmmToke
 
   //4. amm_token_b_pool_account(writable)
   const [token_b_pool_account_address] = await getProgramDerivedAddress({
-    programAddress: address(process.env.AMM_PROGRAM_ADDRESS!),
+    programAddress: address("DjTMdzPyaS4G2Kxa6iyFbckzbtwzL6y66Wawo6WqfTRu"),
     seeds: [
       'pool',
       addressEncoder.encode(address(amm_token_account_address)),
@@ -267,7 +241,7 @@ async function AmmaccountsCreator(data: SwapTokens, decoded_token_data: clmmToke
 
   //9. amm_program_account (read only)
   accounts.push({
-    address: address(process.env.AMM_PROGRAM_ADDRESS!),
+    address: address("DjTMdzPyaS4G2Kxa6iyFbckzbtwzL6y66Wawo6WqfTRu"),
     role: AccountRole.READONLY,
   })
   //10. bitmap_account_one (read only)
@@ -275,7 +249,7 @@ async function AmmaccountsCreator(data: SwapTokens, decoded_token_data: clmmToke
   bitmap_index_one.writeInt32BE(Math.floor(decoded_token_data.current_tick / 10000));
 
   const [bitmap_account_one_pda] = await getProgramDerivedAddress({
-    programAddress:address(process.env.AMM_PROGRAM_ADDRESS!),
+    programAddress:address("DjTMdzPyaS4G2Kxa6iyFbckzbtwzL6y66Wawo6WqfTRu"),
     seeds:["bitmap", bitmap_index_one, addressEncoder.encode(amm_token_account_address) ]
   })
 
@@ -289,7 +263,7 @@ async function AmmaccountsCreator(data: SwapTokens, decoded_token_data: clmmToke
   bitmap_index_two.writeInt32BE(Math.floor(decoded_token_data.current_tick / 10000) + 1);
 
   const [bitmap_account_two_pda] = await getProgramDerivedAddress({
-    programAddress:address(process.env.AMM_PROGRAM_ADDRESS!),
+    programAddress:address("DjTMdzPyaS4G2Kxa6iyFbckzbtwzL6y66Wawo6WqfTRu"),
     seeds:["bitmap", bitmap_index_two, addressEncoder.encode(amm_token_account_address) ]
   })
 
@@ -299,7 +273,8 @@ async function AmmaccountsCreator(data: SwapTokens, decoded_token_data: clmmToke
   })
 
   //12. tick_array_account_one (read only)  
-  const direction = true;
+  // Determine direction: true if swapping A for B, false if B for A
+  const direction = data.token_in_mint === data.token_a_mint_account;
   // if (data.token_a_mint_account < data.token_b_mint_account){
   //   if (data.token_in_mint === data.token_a_mint_account && data.token_out_mint === data.token_b_mint_account){
   //     direction = false;
@@ -309,16 +284,21 @@ async function AmmaccountsCreator(data: SwapTokens, decoded_token_data: clmmToke
   //     direction = false;
   //   }
   // }
-  for (const i of Array.from({ length: 11 }, (_, index) => index)){
+  console.log("direction: ", direction);
+  const filtered_ticks = data.ticks.filter((value) => direction ? value.tick >= decoded_token_data.current_tick : value.tick <= decoded_token_data.current_tick );
+  // console.log(direction ? filtered_ticks.reverse() : filtered_ticks);
+  for (const tick of direction ? filtered_ticks : filtered_ticks.reverse()){
   
     const tick_array_index = Buffer.alloc(4);
-    console.log("tick_array_index: number: ", i,"index", direction ? Math.floor(decoded_token_data.current_tick / 88) + i: Math.floor(decoded_token_data.current_tick / 88) - i );
-  tick_array_index.writeInt32BE(direction ? Math.floor(decoded_token_data.current_tick / 88) + i: Math.floor(decoded_token_data.current_tick / 88) - i);
+    // console.log("tick_array_index: number: ", i,"index", direction ? Math.floor(decoded_token_data.current_tick / 88) + i: Math.floor(decoded_token_data.current_tick / 88) - i );
+    console.log("tick.tick / 88: ", Math.floor(tick.tick / 88))
+    tick_array_index.writeInt32BE(Math.floor(tick.tick / 88));
 
     const [tick_array_pda] = await getProgramDerivedAddress({
-    programAddress:address(process.env.AMM_PROGRAM_ADDRESS!),
+    programAddress:address("DjTMdzPyaS4G2Kxa6iyFbckzbtwzL6y66Wawo6WqfTRu"),
     seeds:[tick_array_index, addressEncoder.encode(amm_token_account_address) ]
     });
+    console.log("tick_array_pda: ", tick_array_pda, "index", tick_array_index);
     accounts.push({address: tick_array_pda,role: AccountRole.READONLY });
   }
   return accounts

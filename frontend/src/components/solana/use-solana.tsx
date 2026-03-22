@@ -9,7 +9,6 @@ import { useWalletUiGill } from '@wallet-ui/react-gill'
 export function useSolana() {
   const walletUi = useWalletUi()
   const client = useWalletUiGill()
-  console.log(walletUi, client)
   return {
     ...walletUi,
     client,

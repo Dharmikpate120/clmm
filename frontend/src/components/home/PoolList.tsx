@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
-import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import type { Market, MarketsResponse } from "@/lib/types/market";
 

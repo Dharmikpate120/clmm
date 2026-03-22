@@ -32,12 +32,12 @@ export async function GET(
       ORDER BY at.tick_position ASC
     `
     const { rows } = await pool.query(query, [id])
-
+    console.log("rows:",rows);
     const ticks = rows.map(row => ({
       tick: row.tick_position,
       liquidity: parseU128(row.net_liquidity),
     }))
-
+    console.log("ticks:",ticks);
     return NextResponse.json({ ticks })
   } catch (error) {
     console.error('[GET /api/markets/[id]/ticks] error:', error)

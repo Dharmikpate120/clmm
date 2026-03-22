@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
@@ -25,16 +26,22 @@ export default function AddLiquidityModal() {
                     <div className="bg-gray-50 dark:bg-surface-darker/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700 flex items-center justify-between cursor-pointer hover:border-primary transition-colors">
                         <div className="flex items-center gap-3">
                             <div className="flex -space-x-2">
-                                <img
-                                    alt="SOL"
-                                    className="w-8 h-8 rounded-full border-2 border-white dark:border-surface-dark bg-black z-10"
-                                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrETAEdMSL3H499w94eluhcBFBsEKq6H4oIZhYfLaSHiYOMv81BQbHAy6PZ7aey9kD_UpolsmVdUdpfKoTz3OptcGWc4ijucd8WnhH0n2fJnwzYRwdZOUjdqrkbW_w7QXSsMIqFy5u2OM0Ff-_mT5HIVQ-bqlg1u_vzGWvOxSiLYr7Z816Y4IFIAHyZYDtNcIg1tciD8OEab2BjraEulEnwlk4s317vYzlPfis28uXg7B1CYqpILSnICDXLQr1DJmPF_rCEqc0OI0"
-                                />
-                                <img
-                                    alt="USDC"
-                                    className="w-8 h-8 rounded-full border-2 border-white dark:border-surface-dark bg-white z-0"
-                                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxwkXGm9PHXmlFjOlqHsxu0zI_SEniw76tPKnm4KkYgtuxAc2_9YpDOr2SSBo2jGKK8FG7h150SpojXCwqP2jDhl03QlyhhnOqDpw4tgW1ASM3YQF0nVqaspCyMSo6LrC6AEaP2cZBhijYn9Sj_6qwY8ptexThUX725a3IHt9Y3-kag9n0dT1TPehsMK4XHg-czD-ZfYjq5EH9R7p-sO-mjO5TkJop9rJFeemFhmz9kxjn8oi_QjvivQGYMkAw4WavVNdW081DlGM"
-                                />
+                                <div className="w-8 h-8 rounded-full border-2 border-white dark:border-surface-dark bg-black z-10 relative overflow-hidden shrink-0">
+                                    <Image
+                                        alt="SOL"
+                                        fill
+                                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrETAEdMSL3H499w94eluhcBFBsEKq6H4oIZhYfLaSHiYOMv81BQbHAy6PZ7aey9kD_UpolsmVdUdpfKoTz3OptcGWc4ijucd8WnhH0n2fJnwzYRwdZOUjdqrkbW_w7QXSsMIqFy5u2OM0Ff-_mT5HIVQ-bqlg1u_vzGWvOxSiLYr7Z816Y4IFIAHyZYDtNcIg1tciD8OEab2BjraEulEnwlk4s317vYzlPfis28uXg7B1CYqpILSnICDXLQr1DJmPF_rCEqc0OI0"
+                                        className="object-cover"
+                                    />
+                                </div>
+                                <div className="w-8 h-8 rounded-full border-2 border-white dark:border-surface-dark bg-white z-0 relative overflow-hidden shrink-0">
+                                    <Image
+                                        alt="USDC"
+                                        fill
+                                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxwkXGm9PHXmlFjOlqHsxu0zI_SEniw76tPKnm4KkYgtuxAc2_9YpDOr2SSBo2jGKK8FG7h150SpojXCwqP2jDhl03QlyhhnOqDpw4tgW1ASM3YQF0nVqaspCyMSo6LrC6AEaP2cZBhijYn9Sj_6qwY8ptexThUX725a3IHt9Y3-kag9n0dT1TPehsMK4XHg-czD-ZfYjq5EH9R7p-sO-mjO5TkJop9rJFeemFhmz9kxjn8oi_QjvivQGYMkAw4WavVNdW081DlGM"
+                                        className="object-cover"
+                                    />
+                                </div>
                             </div>
                             <span className="font-bold text-gray-900 dark:text-white">
                                 SOL-USDC
@@ -160,11 +167,14 @@ export default function AddLiquidityModal() {
                     <div className="bg-gray-50 dark:bg-surface-darker/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700 focus-within:border-primary transition-colors">
                         <div className="flex justify-between mb-2">
                             <div className="flex items-center gap-2">
-                                <img
-                                    alt="SOL"
-                                    className="w-5 h-5 rounded-full"
-                                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrETAEdMSL3H499w94eluhcBFBsEKq6H4oIZhYfLaSHiYOMv81BQbHAy6PZ7aey9kD_UpolsmVdUdpfKoTz3OptcGWc4ijucd8WnhH0n2fJnwzYRwdZOUjdqrkbW_w7QXSsMIqFy5u2OM0Ff-_mT5HIVQ-bqlg1u_vzGWvOxSiLYr7Z816Y4IFIAHyZYDtNcIg1tciD8OEab2BjraEulEnwlk4s317vYzlPfis28uXg7B1CYqpILSnICDXLQr1DJmPF_rCEqc0OI0"
-                                />
+                                <div className="w-5 h-5 rounded-full relative overflow-hidden shrink-0">
+                                    <Image
+                                        alt="SOL"
+                                        fill
+                                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrETAEdMSL3H499w94eluhcBFBsEKq6H4oIZhYfLaSHiYOMv81BQbHAy6PZ7aey9kD_UpolsmVdUdpfKoTz3OptcGWc4ijucd8WnhH0n2fJnwzYRwdZOUjdqrkbW_w7QXSsMIqFy5u2OM0Ff-_mT5HIVQ-bqlg1u_vzGWvOxSiLYr7Z816Y4IFIAHyZYDtNcIg1tciD8OEab2BjraEulEnwlk4s317vYzlPfis28uXg7B1CYqpILSnICDXLQr1DJmPF_rCEqc0OI0"
+                                        className="object-cover"
+                                    />
+                                </div>
                                 <span className="font-bold text-sm text-gray-900 dark:text-white">
                                     SOL
                                 </span>
@@ -185,11 +195,14 @@ export default function AddLiquidityModal() {
                     <div className="bg-gray-50 dark:bg-surface-darker/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700 focus-within:border-primary transition-colors">
                         <div className="flex justify-between mb-2">
                             <div className="flex items-center gap-2">
-                                <img
-                                    alt="USDC"
-                                    className="w-5 h-5 rounded-full"
-                                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxwkXGm9PHXmlFjOlqHsxu0zI_SEniw76tPKnm4KkYgtuxAc2_9YpDOr2SSBo2jGKK8FG7h150SpojXCwqP2jDhl03QlyhhnOqDpw4tgW1ASM3YQF0nVqaspCyMSo6LrC6AEaP2cZBhijYn9Sj_6qwY8ptexThUX725a3IHt9Y3-kag9n0dT1TPehsMK4XHg-czD-ZfYjq5EH9R7p-sO-mjO5TkJop9rJFeemFhmz9kxjn8oi_QjvivQGYMkAw4WavVNdW081DlGM"
-                                />
+                                <div className="w-5 h-5 rounded-full relative overflow-hidden shrink-0">
+                                    <Image
+                                        alt="USDC"
+                                        fill
+                                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxwkXGm9PHXmlFjOlqHsxu0zI_SEniw76tPKnm4KkYgtuxAc2_9YpDOr2SSBo2jGKK8FG7h150SpojXCwqP2jDhl03QlyhhnOqDpw4tgW1ASM3YQF0nVqaspCyMSo6LrC6AEaP2cZBhijYn9Sj_6qwY8ptexThUX725a3IHt9Y3-kag9n0dT1TPehsMK4XHg-czD-ZfYjq5EH9R7p-sO-mjO5TkJop9rJFeemFhmz9kxjn8oi_QjvivQGYMkAw4WavVNdW081DlGM"
+                                        className="object-cover"
+                                    />
+                                </div>
                                 <span className="font-bold text-sm text-gray-900 dark:text-white">
                                     USDC
                                 </span>

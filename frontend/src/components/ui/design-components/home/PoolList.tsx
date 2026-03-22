@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
-import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import VerifiedIcon from "@mui/icons-material/Verified";
 
 export default function PoolList() {
     const pools = [
@@ -122,16 +123,22 @@ export default function PoolList() {
                     >
                         <div className="col-span-4 md:col-span-3 flex items-center">
                             <div className="flex -space-x-2 mr-3 relative">
-                                <img
-                                    alt={pool.tokenA}
-                                    className="w-8 h-8 rounded-full border-2 border-white dark:border-surface-dark bg-black z-10"
-                                    src={pool.tokenAImg}
-                                />
-                                <img
-                                    alt={pool.tokenB}
-                                    className="w-8 h-8 rounded-full border-2 border-white dark:border-surface-dark bg-white z-0"
-                                    src={pool.tokenBImg}
-                                />
+                                <div className="w-8 h-8 rounded-full border-2 border-white dark:border-surface-dark bg-black z-10 relative overflow-hidden shrink-0">
+                                    <Image
+                                        alt={pool.tokenA}
+                                        fill
+                                        src={pool.tokenAImg}
+                                        className="object-cover"
+                                    />
+                                </div>
+                                <div className="w-8 h-8 rounded-full border-2 border-white dark:border-surface-dark bg-white z-0 relative overflow-hidden shrink-0">
+                                    <Image
+                                        alt={pool.tokenB}
+                                        fill
+                                        src={pool.tokenBImg}
+                                        className="object-cover"
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <div className="flex items-center gap-2">

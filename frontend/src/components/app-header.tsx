@@ -15,7 +15,7 @@ export function AppHeader({ links = [] }: { links: { label: string; path: string
   const pathname = usePathname()
 
   const isActive = (path: string) => {
-    return pathname === path ? "text-primary bg-primary/10 dark:text-secondary dark:bg-secondary/10" : "text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-secondary";
+    return pathname === path ? "text-primary bg-primary dark:text-primary dark:bg-secondary" : "text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-primary/50";
   };
 
   return (

@@ -10,6 +10,7 @@ export type AmmAccountData = {
   start_tick: string
   end_tick: string
   admin_account: string
+  // nft_signer: string
 }
 export type AmmAddLiquidity = {
   token_a_mint_account: string
@@ -44,7 +45,8 @@ export type SwapTokens = {
   token_out_mint:string
   max_amount_in: string
   minimum_amount_out: string
-  swapper_account: string 
+  swapper_account: string
+  ticks: TickData[]
 }
 
 export type clmmTokenAccountType = {
@@ -59,3 +61,8 @@ export type clmmTokenAccountType = {
   fee_growth: bigint
   protocol_fee: bigint
 }
+
+export type TickData = {
+    tick: number;
+    liquidity: number;
+};

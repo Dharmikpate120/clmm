@@ -3,8 +3,10 @@
 import SearchIcon from "@mui/icons-material/Search";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import AddIcon from "@mui/icons-material/Add";
+import { useWalletUi } from "@wallet-ui/react";
 
 export default function SubHeader() {
+    const walletUi = useWalletUi();
     return (
         <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
@@ -31,10 +33,12 @@ export default function SubHeader() {
                     <FilterListIcon fontSize="small" />
                     Filter
                 </button>
-                <button className="px-4 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium shadow-glow-primary transition-all flex items-center gap-2 cursor-pointer">
-                    <AddIcon fontSize="small" />
-                    Create Pool
-                </button>
+                {walletUi.account?.address === process.env.NEXT_PUBLIC_ADMIN_ACCOUNT && (
+                    <button className="px-4 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium shadow-glow-primary transition-all flex items-center gap-2 cursor-pointer">
+                        <AddIcon fontSize="small" />
+                        Create Pool
+                    </button>
+                )}
             </div>
         </div>
     );

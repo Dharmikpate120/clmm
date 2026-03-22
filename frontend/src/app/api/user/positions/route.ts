@@ -2,18 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import type { Position } from '@/lib/types/position'
 
-function parseU128(raw: string): number {
-  try {
-    const big = BigInt(raw.split(".")[0])
-    const divisor = BigInt(2) ** BigInt(64)
-    const intPart = Number(big / divisor)
-    const fracPart = Number(big % divisor) / Number(divisor)
-    return intPart + fracPart
-  } catch (err) {
-    console.log(err);
-    return 0
-  }
-}
 
 function parseTick(raw: string): number {
   return parseInt(raw ?? '0', 10) || 0

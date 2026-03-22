@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useWalletUi } from "@wallet-ui/react";
-import SettingsIcon from "@mui/icons-material/Settings";
+import Image from "next/image";
+import { useWalletUi, useWalletUiSigner } from "@wallet-ui/react";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
-import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import addLiquidity from "@/lib/actions/addLiquidity";
 import { AmmAddLiquidity } from "@/lib/types";
 import { Market } from "@/lib/types/market";
 import { TokenAccount } from "@/lib/types/position";
+import { useWalletUiSignAndSend } from "@wallet-ui/react-gill";
 
 /* 
 const initial_state = {
@@ -22,7 +22,7 @@ const initial_state = {
     start_tick: "20000",
     end_tick: "40000",
     provider_account: "GK5uAKRv4Abn4szsDuhvcBDoYp8cwAcggkkynMjmSZf3"
-}
+    }
 */
 
 type TickData = {
@@ -35,20 +35,21 @@ const TICK_BASE = 1.0001;
 const MIN_TICK = -443636;
 const MAX_TICK = 443636;
 
-function tickToPrice(tick: number): number {
+const tickToPrice = (tick: number): number => {
     return Math.pow(TICK_BASE, tick);
 }
 
-function priceToTick(price: number): number {
+const priceToTick = (price: number): number => {
     if (price <= 0) return MIN_TICK;
     return Math.round(Math.log(price) / Math.log(TICK_BASE));
 }
 
 export default function AddLiquidityModal({ market }: { market: Market }) {
     const { account } = useWalletUi();
+    const signer = useWalletUiSigner({ account: account! })
+    const sender = useWalletUiSignAndSend()
     const [userTokenAccounts, setUserTokenAccounts] = useState<TokenAccount[]>([]);
     const [ticks, setTicks] = useState<TickData[]>([]);
-    const [isLoadingTicks, setIsLoadingTicks] = useState(true);
 
     // Histogram scale state
     const [tickStep, setTickStep] = useState(50);
@@ -78,12 +79,10 @@ export default function AddLiquidityModal({ market }: { market: Market }) {
     const [dragging, setDragging] = useState<'min' | 'max' | null>(null);
 
     useEffect(() => {
-        if (!account?.address) return;
-
         const fetchData = async () => {
             try {
                 // Fetch User Token Accounts
-                const resAcc = await fetch(`/api/user/token-accounts?user_address=${account.address}`);
+                const resAcc = await fetch(`/api/user/token-accounts?user_address=${account?.address}`);
                 const dataAcc = await resAcc.json();
                 const accounts = dataAcc.tokenAccounts || [];
                 setUserTokenAccounts(accounts);
@@ -96,27 +95,40 @@ export default function AddLiquidityModal({ market }: { market: Market }) {
                     ...prev,
                     provider_token_a_account: accA?.token_address || "",
                     provider_token_b_account: accB?.token_address || "",
-                    provider_account: account.address
+                    provider_account: account?.address || ""
                 }));
 
-                // Fetch Ticks for histogram
-                setIsLoadingTicks(true);
                 const resTicks = await fetch(`/api/markets/${market.id}/ticks`);
                 const dataTicks = await resTicks.json();
                 setTicks(dataTicks.ticks || []);
-                setIsLoadingTicks(false);
             } catch (error) {
                 console.error("Error fetching data:", error);
-                setIsLoadingTicks(false);
             }
         };
 
-        fetchData();
+        if (account?.address) fetchData();
     }, [account?.address, market.id, market.mint_address_a, market.mint_address_b]);
+
+    // Range Selection Logic
+    const minTickRaw = priceToTick(parseFloat(minPrice));
+    const minTick = Math.max(minTickRaw, 0); // Enforce 0 minimum
+    const maxTickRaw = priceToTick(parseFloat(maxPrice));
+    const maxTick = Math.max(maxTickRaw, minTick + 1); // Enforce 0 minimum and > minTick
+
+    // Sync ticks to formData whenever they change via handles or buttons
+    useEffect(() => {
+        setFormData(prev => ({
+            ...prev,
+            start_tick: minTick.toString(),
+            end_tick: maxTick.toString()
+        }));
+    }, [minTick, maxTick]);
 
     const handleAddLiquidity = async () => {
         const instruction = await addLiquidity(formData);
-        console.log("Add Liquidity instruction:", instruction);
+
+        const result = await sender(instruction!, signer);
+        console.log("Add Liquidity instruction:", instruction, result);
     };
 
     const isInRange = currentPrice >= parseFloat(minPrice) && currentPrice <= parseFloat(maxPrice);
@@ -136,11 +148,6 @@ export default function AddLiquidityModal({ market }: { market: Market }) {
     }
     const maxLiquidity = Math.max(...bars.map(b => b.liquidity), 1);
 
-    // Range Selection Logic
-    const minTickRaw = priceToTick(parseFloat(minPrice));
-    const minTick = Math.max(minTickRaw, 0); // Enforce 0 minimum
-    const maxTickRaw = priceToTick(parseFloat(maxPrice));
-    const maxTick = Math.max(maxTickRaw, minTick + 1); // Enforce 0 minimum and > minTick
 
     const getXForTick = (tick: number) => {
         const offset = tick - currentTick;
@@ -160,7 +167,7 @@ export default function AddLiquidityModal({ market }: { market: Market }) {
 
         const rect = histogramRef.current.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 100;
-        let tick = Math.min(Math.max(getTickForX(x), 0), MAX_TICK); // Enforce 0 minimum
+        const tick = Math.min(Math.max(getTickForX(x), 0), MAX_TICK); // Enforce 0 minimum
 
         if (dragging === 'min') {
             if (tick < maxTick) {
@@ -181,17 +188,11 @@ export default function AddLiquidityModal({ market }: { market: Market }) {
                 if (x < 70 && minPercent > 30) setTickStep(prev => Math.max(prev / 1.1, 1));
             }
         }
-    }, [dragging, currentTick, tickStep, minTick, maxTick, getXForTick]);
+    }, [dragging, minTick, maxTick, getXForTick, getTickForX]);
 
     const handleMouseUp = useCallback(() => {
         setDragging(null);
     }, []);
-
-    const setFullRange = () => {
-        setMinPrice(tickToPrice(0).toFixed(3));
-        setMaxPrice(tickToPrice(MAX_TICK).toFixed(3));
-        setTickStep(MAX_TICK / numBars); // Zoom out to max
-    };
 
     useEffect(() => {
         if (dragging) {
@@ -220,11 +221,14 @@ export default function AddLiquidityModal({ market }: { market: Market }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-muted/50 rounded-xl p-4 border border-border flex items-center justify-between group hover:border-primary transition-colors">
                         <div className="flex items-center gap-3">
-                            <img
-                                alt="Token A"
-                                className="w-8 h-8 rounded-full border-2 border-background bg-black"
-                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrETAEdMSL3H499w94eluhcBFBsEKq6H4oIZhYfLaSHiYOMv81BQbHAy6PZ7aey9kD_UpolsmVdUdpfKoTz3OptcGWc4ijucd8WnhH0n2fJnwzYRwdZOUjdqrkbW_w7QXSsMIjFy5u2OM0Ff-_mT5HIVQ-bqlg1u_vzGWvOxSiLYr7Z816Y4IFIAHyZYDtNcIg1tciD8OEab2BjraEulEnwlk4s317vYzlPfis28uXg7B1CYqpILSnICDXLQr1DJmPF_rCEqc0OI0"
-                            />
+                            <div className="w-8 h-8 rounded-full border-2 border-background bg-black relative overflow-hidden shrink-0">
+                                <Image
+                                    alt="Token A"
+                                    fill
+                                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrETAEdMSL3H499w94eluhcBFBsEKq6H4oIZhYfLaSHiYOMv81BQbHAy6PZ7aey9kD_UpolsmVdUdpfKoTz3OptcGWc4ijucd8WnhH0n2fJnwzYRwdZOUjdqrkbW_w7QXSsMIjFy5u2OM0Ff-_mT5HIVQ-bqlg1u_vzGWvOxSiLYr7Z816Y4IFIAHyZYDtNcIg1tciD8OEab2BjraEulEnwlk4s317vYzlPfis28uXg7B1CYqpILSnICDXLQr1DJmPF_rCEqc0OI0"
+                                    className="object-cover"
+                                />
+                            </div>
                             <div className="flex flex-col">
                                 <span className="font-bold text-foreground text-xs">Token A</span>
                                 <span className="text-[9px] font-mono text-muted-foreground truncate max-w-[120px]">{market.mint_address_a}</span>
@@ -233,11 +237,14 @@ export default function AddLiquidityModal({ market }: { market: Market }) {
                     </div>
                     <div className="bg-muted/50 rounded-xl p-4 border border-border flex items-center justify-between group hover:border-primary transition-colors">
                         <div className="flex items-center gap-3">
-                            <img
-                                alt="Token B"
-                                className="w-8 h-8 rounded-full border-2 border-background bg-white"
-                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxwkXGm9PHXmlFjOlqHsxu0zI_SEniw76tPKnm4KkYgtuxAc2_9YpDOr2SSBo2jGKK8FG7h150SpojXCwqP2jDhl03QlyhhnOqDpw4tgW1ASM3YQF0nVqaspCyMSo6LrC6AEaP2cZBhijYn9Sj_6qwY8ptexThUX725a3IHt9Y3-kag9n0dT1TPehsMK4XHg-czD-ZfYjq5EH9R7p-sO-mjO5TkJop9rJFeemFhmz9kxjn8oi_QjvivQGYMkAw4WavVNdW081DlGM"
-                            />
+                            <div className="w-8 h-8 rounded-full border-2 border-background bg-white relative overflow-hidden shrink-0">
+                                <Image
+                                    alt="Token B"
+                                    fill
+                                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxwkXGm9PHXmlFjOlqHsxu0zI_SEniw76tPKnm4KkYgtuxAc2_9YpDOr2SSBo2jGKK8FG7h150SpojXCwqP2jDhl03QlyhhnOqDpw4tgW1ASM3YQF0nVqaspCyMSo6LrC6AEaP2cZBhijYn9Sj_6qwY8ptexThUX725a3IHt9Y3-kag9n0dT1TPehsMK4XHg-czD-ZfYjq5EH9R7p-sO-mjO5TkJop9rJFeemFhmz9kxjn8oi_QjvivQGYMkAw4WavVNdW081DlGM"
+                                    className="object-cover"
+                                />
+                            </div>
                             <div className="flex flex-col">
                                 <span className="font-bold text-foreground text-xs">Token B</span>
                                 <span className="text-[9px] font-mono text-muted-foreground truncate max-w-[120px]">{market.mint_address_b}</span>
@@ -393,7 +400,7 @@ export default function AddLiquidityModal({ market }: { market: Market }) {
                         className="bg-transparent font-mono font-bold text-xl w-full focus:outline-none"
                         placeholder="Enter liquidity amount..."
                         value={formData.liquidity}
-                        onChange={e => setFormData({ ...formData, liquidity: e.target.value })}
+                        onChange={e => setFormData(prev => ({ ...prev, liquidity: e.target.value }))}
                     />
                     <div className="text-[9px] text-muted-foreground mt-1 italic">Determines the required token amounts below</div>
                 </div>
@@ -402,7 +409,9 @@ export default function AddLiquidityModal({ market }: { market: Market }) {
                     <div className={`bg-card p-4 rounded-xl border transition-all ${isAboveRange ? 'opacity-40 grayscale-[0.5]' : 'border-border shadow-sm'}`}>
                         <div className="flex justify-between mb-3">
                             <div className="flex items-center gap-2">
-                                <img className="w-6 h-6 rounded-full shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrETAEdMSL3H499w94eluhcBFBsEKq6H4oIZhYfLaSHiYOMv81BQbHAy6PZ7aey9kD_UpolsmVdUdpfKoTz3OptcGWc4ijucd8WnhH0n2fJnwzYRwdZOUjdqrkbW_w7QXSsMIjFy5u2OM0Ff-_mT5HIVQ-bqlg1u_vzGWvOxSiLYr7Z816Y4IFIAHyZYDtNcIg1tciD8OEab2BjraEulEnwlk4s317vYzlPfis28uXg7B1CYqpILSnICDXLQr1DJmPF_rCEqc0OI0" alt="SOL" />
+                                <div className="w-6 h-6 rounded-full shadow-sm relative overflow-hidden">
+                                    <Image fill src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrETAEdMSL3H499w94eluhcBFBsEKq6H4oIZhYfLaSHiYOMv81BQbHAy6PZ7aey9kD_UpolsmVdUdpfKoTz3OptcGWc4ijucd8WnhH0n2fJnwzYRwdZOUjdqrkbW_w7QXSsMIjFy5u2OM0Ff-_mT5HIVQ-bqlg1u_vzGWvOxSiLYr7Z816Y4IFIAHyZYDtNcIg1tciD8OEab2BjraEulEnwlk4s317vYzlPfis28uXg7B1CYqpILSnICDXLQr1DJmPF_rCEqc0OI0" alt="SOL" className="object-cover" />
+                                </div>
                                 <span className="font-bold text-sm">SOL</span>
                             </div>
                             <span className="text-[10px] font-bold text-muted-foreground uppercase">Bal: {userTokenAccounts.find(a => a.token_mint_address === market.mint_address_a)?.balance || "0.00"}</span>
@@ -428,7 +437,9 @@ export default function AddLiquidityModal({ market }: { market: Market }) {
                     <div className={`bg-card p-4 rounded-xl border transition-all ${isBelowRange ? 'opacity-40 grayscale-[0.5]' : 'border-border shadow-sm'}`}>
                         <div className="flex justify-between mb-3">
                             <div className="flex items-center gap-2">
-                                <img className="w-6 h-6 rounded-full shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxwkXGm9PHXmlFjOlqHsxu0zI_SEniw76tPKnm4KkYgtuxAc2_9YpDOr2SSBo2jGKK8FG7h150SpojXCwqP2jDhl03QlyhhnOqDpw4tgW1ASM3YQF0nVqaspCyMSo6LrC6AEaP2cZBhijYn9Sj_6qwY8ptexThUX725a3IHt9Y3-kag9n0dT1TPehsMK4XHg-czD-ZfYjq5EH9R7p-sO-mjO5TkJop9rJFeemFhmz9kxjn8oi_QjvivQGYMkAw4WavVNdW081DlGM" alt="USDC" />
+                                <div className="w-6 h-6 rounded-full shadow-sm relative overflow-hidden">
+                                    <Image fill src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxwkXGm9PHXmlFjOlqHsxu0zI_SEniw76tPKnm4KkYgtuxAc2_9YpDOr2SSBo2jGKK8FG7h150SpojXCwqP2jDhl03QlyhhnOqDpw4tgW1ASM3YQF0nVqaspCyMSo6LrC6AEaP2cZBhijYn9Sj_6qwY8ptexThUX725a3IHt9Y3-kag9n0dT1TPehsMK4XHg-czD-ZfYjq5EH9R7p-sO-mjO5TkJop9rJFeemFhmz9kxjn8oi_QjvivQGYMkAw4WavVNdW081DlGM" alt="USDC" className="object-cover" />
+                                </div>
                                 <span className="font-bold text-sm">USDC</span>
                             </div>
                             <span className="text-[10px] font-bold text-muted-foreground uppercase">Bal: {userTokenAccounts.find(a => a.token_mint_address === market.mint_address_b)?.balance || "0.00"}</span>

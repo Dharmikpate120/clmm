@@ -1,13 +1,12 @@
 import { Pool } from 'pg'
 
 declare global {
-  // eslint-disable-next-line no-var
   var _pgIndexerPool: Pool | undefined
 }
 
 function createPool(): Pool {
   // Use INDEXER_DATABASE_URL if set, otherwise fall back to DATABASE_URL
-  const connectionString = process.env.INDEXER_DATABASE_URL ?? process.env.DATABASE_URL
+  const connectionString = process.env.INDEXER_DATABASE_URL
   if (!connectionString) {
     throw new Error('INDEXER_DATABASE_URL (or DATABASE_URL) environment variable is not set')
   }

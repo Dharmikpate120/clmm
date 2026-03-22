@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
 import { Market } from "@/lib/types/market";
 import { Position } from "@/lib/types/position";
 import { ellipsify } from "@/lib/utils";

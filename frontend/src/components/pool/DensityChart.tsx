@@ -1,12 +1,9 @@
 "use client";
 
+import { TickData } from "@/lib/types";
 import { Market } from "@/lib/types/market";
 import { useState, useRef, useEffect } from "react";
 
-type TickData = {
-    tick: number;
-    liquidity: number;
-};
 
 export default function DensityChart({ market, ticks }: { market: Market, ticks: TickData[] }) {
     // Zoom state

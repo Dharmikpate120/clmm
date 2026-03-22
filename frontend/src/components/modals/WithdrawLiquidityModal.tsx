@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import VerifiedIcon from "@mui/icons-material/Verified";
-import { useWalletUi } from "@wallet-ui/react";
+import { useWalletUi, useWalletUiSigner } from "@wallet-ui/react";
 import type { AmmWithdrawLiquidity } from "@/lib/types";
 import { Market } from "@/lib/types/market";
 import { Position, TokenAccount } from "@/lib/types/position";
 import withdrawLiquidity from "@/lib/actions/withdrawLiquidity";
 import { ellipsify } from "@/lib/utils";
+import { useWalletUiSignAndSend } from "@wallet-ui/react-gill";
 
 const TICK_BASE = 1.0001;
 
@@ -30,6 +31,8 @@ const initialWithdrawState: AmmWithdrawLiquidity = {
 export default function WithdrawLiquidityModal({ market }: { market: Market }) {
     const [step, setStep] = useState(1);
     const { account } = useWalletUi();
+        const signer = useWalletUiSigner({ account: account! })
+        const sender = useWalletUiSignAndSend()
     const [positions, setPositions] = useState<Position[]>([]);
     const [userTokenAccounts, setUserTokenAccounts] = useState<TokenAccount[]>([]);
     const [loading, setLoading] = useState(true);
@@ -82,7 +85,7 @@ export default function WithdrawLiquidityModal({ market }: { market: Market }) {
         };
 
         fetchData();
-    }, [account?.address, market.id, market.mint_address_a, market.mint_address_b]);
+    }, [account?.address, market.id, market.mint_address_a, market.mint_address_b, market.market_address]);
 
     useEffect(() => {
         if (selectedPosition && account?.address) {
@@ -101,7 +104,7 @@ export default function WithdrawLiquidityModal({ market }: { market: Market }) {
                 nft_mint_account: selectedPosition.nft_address,
             });
         }
-    }, [selectedPosition, withdrawPercent, account?.address, market, userTokenAccounts]);
+    }, [selectedPosition, withdrawPercent, account?.address, market.mint_address_a, market.mint_address_b, market.market_address, userTokenAccounts]);
 
     const handleLiquidityAmountChange = (val: string) => {
         if (!selectedPosition) return;
@@ -123,18 +126,13 @@ export default function WithdrawLiquidityModal({ market }: { market: Market }) {
         handleLiquidityAmountChange((current + delta).toString());
     };
 
-    const handleWithdrawalInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setWithdrawalData((prevState) => ({
-            ...prevState,
-            [name]: value,
-        }));
-    };
 
     const submitWithdrawalState = async () => {
         const instruction = await withdrawLiquidity(withdrawalData);
-        console.log(instruction);
-        setWithdrawalData(initialWithdrawState);
+
+        const result = await sender(instruction!, signer);
+        console.log(instruction, result);
+        // setWithdrawalData(initialWithdrawState);
     };
 
     // Step 1: Select Position

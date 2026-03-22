@@ -2,13 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import type { Market } from '@/lib/types/market'
 
-function parseU128(raw: string): number {
+function parsePrice(raw: string): number {
   try {
     const big = BigInt(raw)
     const divisor = BigInt(2) ** BigInt(64)
-    const intPart = Number(big / divisor)
-    const fracPart = Number(big % divisor) / Number(divisor)
-    return (intPart + fracPart) * (intPart + fracPart)
+    const val = Number(big) / Number(divisor)
+    return val * val
+  } catch {
+    return 0
+  }
+}
+
+function parseQty(raw: string): number {
+  try {
+    const big = BigInt(raw)
+    const divisor = BigInt(2) ** BigInt(64)
+    return Number(big) / Number(divisor)
   } catch {
     return 0
   }
@@ -58,10 +67,10 @@ export async function GET(
       market_address: row.market_address,
       mint_address_a: row.mint_address_a,
       mint_address_b: row.mint_address_b,
-      current_price: parseU128(row.current_price),
+      current_price: parsePrice(row.current_price),
       current_tick: parseU32(row.current_tick),
-      fees: parseU128(row.fees),
-      active_liquidity: parseU128(row.active_liquidity),
+      fees: parseQty(row.fees),
+      active_liquidity: parseQty(row.active_liquidity),
       pool_address_a: row.pool_address_a,
       pool_address_b: row.pool_address_b,
       token_amount_a: row.token_amount_a ?? null,
