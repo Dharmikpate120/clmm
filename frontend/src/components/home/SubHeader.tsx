@@ -17,13 +17,13 @@ const initialState = {
  spl-token create-token --decimals 0
  */
   token_a_mint_account: 'GQFLMUdzy8sCjfg63W9JQWY1fP91sLvprwvZ7nuwriTh',
-  token_b_mint_account: 'DXtGjeqJN8QJCZfsSemZJPGbr2B3EM1katBWhGmGRro6',
+  token_b_mint_account: '3pm8ZVVLyrv12uWniKP9zipTRgFGRD1HYsnngdk983Lm',
   /* 
-spl-token create-account DXtGjeqJN8QJCZfsSemZJPGbr2B3EM1katBWhGmGRro6
-spl-token mint DXtGjeqJN8QJCZfsSemZJPGbr2B3EM1katBWhGmGRro6 200000 -- 3UaV9LNXeC2bgxUdKj1jEbuDUYgMADzKDPB3YZ3ZeNWv
+spl-token create-account 3pm8ZVVLyrv12uWniKP9zipTRgFGRD1HYsnngdk983Lm
+spl-token mint 3pm8ZVVLyrv12uWniKP9zipTRgFGRD1HYsnngdk983Lm 200000 -- HNgNHWPezKiUtv9zdD1zSRiqyZJt99nt56EaxU7LeAX8
 */
   admin_token_a_account: 'FvwCPiRmfHoRWmQ4nX6ywRa3x2g7PgisbGwyY33xE6uU',
-  admin_token_b_account: '3UaV9LNXeC2bgxUdKj1jEbuDUYgMADzKDPB3YZ3ZeNWv',
+  admin_token_b_account: 'HNgNHWPezKiUtv9zdD1zSRiqyZJt99nt56EaxU7LeAX8',
   token_a_amount: '100000',
   token_b_amount: '10000',
   start_tick: '22000',
