@@ -4,7 +4,7 @@ import TransactionList from '@/components/pool/TransactionList'
 import WalletDependentContent from '@/components/pool/WalletDependentContent'
 
 async function getMarketData(id: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/markets/${id}`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/markets/${id}`, {
     cache: 'no-store',
   })
   if (!res.ok) return null
@@ -12,7 +12,7 @@ async function getMarketData(id: string) {
 }
 
 async function getTicksData(id: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/markets/${id}/ticks`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/markets/${id}/ticks`, {
     cache: 'no-store',
   })
   if (!res.ok) return []
