@@ -24,14 +24,17 @@ pub fn activate_bit(bitarray: &mut [u8], tick: u64) -> &mut [u8] {
         let bits = &mut bitarray[index as usize];
         msg!("trail: {:?}, index: {:?}, position: {:?}, bits before: {:?}", trail, index, position, bits);
         *bits |= 1 << position;
-        msg!("bits after: {:?}", bits);
+        // msg!("bits after: {:?}", bits);
     }
-    msg!("1: {}, 2: {}, 3: {}, 4:{}", bitarray[0], bitarray[1], bitarray[2], bitarray[3]);
+    // msg!("1: {}, 2: {}, 3: {}, 4:{}", bitarray[0], bitarray[1], bitarray[2], bitarray[3]);
+    // let status1 = check_bit_status(bitarray, tick);
+    msg!("status1asdfghjkl; : {:?}", bitarray[(tick / 8) as usize]);
     bitarray
 }
 
 pub fn deactivate_bit(bitarray: &mut [u8], tick: u64) -> &mut [u8] {
     let status = check_bit_status(bitarray, tick);
+    msg!("status before: {:?}", status);
     if status == 1 {
         let trail = tick % 10000;
         let index = trail / 8;
@@ -40,6 +43,8 @@ pub fn deactivate_bit(bitarray: &mut [u8], tick: u64) -> &mut [u8] {
 
         *bits &= !(1 << position);
     }
+    // let status1 = check_bit_status(bitarray, tick);
+    msg!("status1asdfghjkl; : {:?}", bitarray[(tick / 8) as usize]);
     bitarray
 }
 pub fn get_bitarray_index(tick:u32) -> u32 {

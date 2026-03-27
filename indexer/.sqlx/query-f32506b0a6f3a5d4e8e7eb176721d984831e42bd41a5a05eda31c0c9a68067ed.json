@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM position_accounts WHERE position_address = $1;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f32506b0a6f3a5d4e8e7eb176721d984831e42bd41a5a05eda31c0c9a68067ed"
+}

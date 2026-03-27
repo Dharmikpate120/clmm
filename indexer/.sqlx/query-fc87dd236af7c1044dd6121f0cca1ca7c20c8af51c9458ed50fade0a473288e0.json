@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE markets SET current_price = $1, current_tick = $2, active_liquidity = $3 WHERE market_address = $4;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fc87dd236af7c1044dd6121f0cca1ca7c20c8af51c9458ed50fade0a473288e0"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO transactions VALUES (DEFAULT, $1, $2, $3, $4, $5, DEFAULT, DEFAULT, $6, $7, DEFAULT);",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Int4",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5d0265444a5cc6d7493bcf6a9194685dae7f06fc1f5df5139cd41920d9b38d12"
+}

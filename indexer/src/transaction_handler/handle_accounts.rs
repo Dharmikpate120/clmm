@@ -83,6 +83,8 @@ pub async fn handle_create_token_account(
             fee_growth,
             protocol_fee,
         } => {
+            let result_calc = (sqrt_price_a_by_b as f64) / (2.0 as f64).powi(64);
+            println!("qwertyuiop[]: {:?}",result_calc * result_calc);
             let _ = sqlx
                 ::query!(
                     "INSERT INTO markets VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7, $8, $9);",
@@ -106,7 +108,7 @@ pub async fn update_market_token_account(token_account: Account,
     market_address: Address) -> anyhow::Result<()>{
         let db = get_pg().await;
 
-        let _ = sqlx::query_as!(Market,"SELECT * FROM markets WHERE market_address = $1;", market_address.to_string()).fetch_one(db).await?;
+        let _ = sqlx::query_as::<_, Market>("SELECT * FROM markets WHERE market_address = $1;").bind(market_address.to_string()).fetch_one(db).await?;
      let data = AMMAccount::unpack_from_slice(&token_account.data)?;
     println!("token_account data: {:?}", data);
     match data {
@@ -125,6 +127,8 @@ pub async fn update_market_token_account(token_account: Account,
             fee_growth,
             protocol_fee,
         } => {
+            let result_calc = (sqrt_price_a_by_b as f64) / (2.0 as f64).powi(64);
+            println!("qwertyuiop[]: {:?}",result_calc * result_calc);
             let update_result = sqlx::query!(
                 "UPDATE markets SET current_price = $1, current_tick = $2, active_liquidity = $3 WHERE market_address = $4;",
                 sqrt_price_a_by_b.to_string(),
@@ -160,12 +164,7 @@ pub async fn create_token_pool_account(
 
     // here the address needs to be stored in canonical order in db other wise it won't work and the addresses passed also needs to be in canonical order
     let market: Market = sqlx
-        ::query_as!(
-            Market,
-            "SELECT * FROM markets WHERE mint_address_a = $1 AND mint_address_b = $2;",
-            token_a_address.to_string(),
-            token_b_address.to_string()
-        )
+        ::query_as::<_, Market>("SELECT * FROM markets WHERE mint_address_a = $1 AND mint_address_b = $2;").bind(token_a_address.to_string()).bind(token_b_address.to_string())
         .fetch_one(db).await?;
 
     let _ = sqlx
@@ -201,29 +200,29 @@ pub async fn handle_update_token_account(
             return Err(anyhow!("token account not initialized!"));
         }
         AMMAccount::Initialized {
-            pool_authority,
-            token_a_mint,
-            token_b_mint,
+            pool_authority: _,
+            token_a_mint: _,
+            token_b_mint: _,
             token_a_pool,
             token_b_pool,
             sqrt_price_a_by_b,
             current_tick,
             active_liquidity,
             fee_growth,
-            protocol_fee,
+            protocol_fee: _,   
         } => {
+            let result_calc = (sqrt_price_a_by_b as f64) / (2.0 as f64).powi(64);
+            println!("qwertyuiop[]: {:?}",result_calc * result_calc);
             let _ = sqlx
                 ::query!(
-                    "UPDATE markets SET  current_price = $1, current_tick = $2, fees = $3, active_liquidity = $4, pool_address_a = $5, pool_address_b = $6, market_address = $7 WHERE mint_address_a = $8 AND mint_address_b = $9;",
+                    "UPDATE markets SET  current_price = $1, current_tick = $2, fees = $3, active_liquidity = $4, pool_address_a = $5, pool_address_b = $6 WHERE market_address = $7;",
                     sqrt_price_a_by_b.to_string(),
                     current_tick.to_string(),
                     fee_growth.to_string(),
                     active_liquidity.to_string(),
                     token_a_pool.to_string(),
                     token_b_pool.to_string(),
-                    market_address.to_string(),
-                    token_b_mint.to_string(),
-                    token_a_mint.to_string()
+                    market_address.to_string()
                 )
                 .execute(db).await;
         }
@@ -240,11 +239,7 @@ pub async fn handle_create_position_account(
 ) -> anyhow::Result<()> {
     let db: &sqlx::Pool<sqlx::Postgres> = get_pg().await;
     println!("market address: {:?}", market_address.to_string());
-    let market_data = sqlx::query_as!(
-        Market, 
-        "SELECT * FROM markets WHERE market_address = $1;", 
-        market_address.to_string()
-    ).fetch_one(db).await?;
+    let market_data = sqlx::query_as::<_, Market>("SELECT * FROM markets WHERE market_address = $1;").bind(market_address.to_string()).fetch_one(db).await?;
     println!("market data: {:?}", market_data);
     let position_data: PositionAccount = PositionAccount::unpack_from_slice(
         &position_account.data
@@ -325,7 +320,7 @@ pub async fn delete_position_account(position_address: Address) -> anyhow::Resul
 }
 pub async fn get_position_account(position_address: Address) -> anyhow::Result<DbPositionAccount>{
     let db = get_pg().await;
-    let position_data = sqlx::query_as!(DbPositionAccount, "SELECT * FROM position_accounts WHERE position_address = $1;", position_address.to_string()).fetch_one(db).await?;
+    let position_data = sqlx::query_as::<_, DbPositionAccount>("SELECT * FROM position_accounts WHERE position_address = $1;").bind(position_address.to_string()).fetch_one(db).await?;
     Ok(position_data)
 }
 pub async fn create_user_token_account(
@@ -337,7 +332,7 @@ pub async fn create_user_token_account(
 
     let user_token_data = spl_token_interface::state::Account::unpack(&user_token_account.data)?;
     println!("create_user_token_account user address & token mint addr: {:?}, {:?}", user_address.to_string(), user_token_data.mint.to_string());
-    let user_token_data_db = sqlx::query_as!(UserToken, "SELECT * FROM user_token_accounts WHERE user_address = $1 AND token_mint_address = $2;", user_address.to_string(), user_token_data.mint.to_string()).fetch_optional(db).await?;
+    let user_token_data_db = sqlx::query_as::<_, UserToken>("SELECT * FROM user_token_accounts WHERE user_address = $1 AND token_mint_address = $2;").bind(user_address.to_string()).bind(user_token_data.mint.to_string()).fetch_optional(db).await?;
     println!("create_user_token_account user token data db: {:?}", user_token_data_db);
     match user_token_data_db{
         Some(_)=> {
@@ -369,15 +364,14 @@ pub async fn create_user_token_account(
 pub async fn get_or_create_user(user_data: User) -> anyhow::Result<User>{
     let db = get_pg().await;
     let user = sqlx
-        ::query_as!(User, "SELECT * FROM users where id = $1;", user_data.id)
-        .fetch_optional(db).await?;
+        ::query_as::<_, User>("SELECT * FROM users where id = $1;").bind(user_data.id.clone()).fetch_optional(db).await?;
     let user_data = match user {
         None => {
             let _ = sqlx
                 ::query!(
                     "INSERT INTO users VALUES ($1, $2);",
-                    user_data.id,
-                    user_data.id
+                    user_data.id.clone(),
+                    user_data.id.clone()
                 )
                 .execute(db).await?;
 
@@ -399,20 +393,13 @@ pub async fn handle_create_active_tick(
     let net_liquidity = data[tick_tail as usize];
     println!("tick_tail: {:?}, {:?}, {:?}", tick_tail, tick_index, net_liquidity);
     println!("handle_create_active_tick market address: {:?}", market_address.to_string());
-    let market = sqlx::query_as!(
-        Market, 
-        "SELECT * FROM markets WHERE market_address = $1;", 
-        market_address.to_string()
-    ).fetch_one(db).await?;
+    let market = sqlx::query_as::<_, Market>("SELECT * FROM markets WHERE market_address = $1;").bind(market_address.to_string()).fetch_one(db).await?;
     println!("handle_create_active_tick market data: {:?}", market);
 
-    println!("handle_create_active_tick tick index: {:?}, tick_index: {:?}", market.id, tick_index);
-    let active_tick = sqlx::query_as!(
-        ActiveTick, 
+    println!("handle_create_active_tick tick index: {:?}, tick_index: {:?}", market.id, tick_index);    
+    let active_tick = sqlx::query_as::<_, ActiveTick>(
         "SELECT * FROM active_ticks where market_id = $1 AND tick_position = $2;", 
-        market.id, 
-        tick_index as i32
-    ).fetch_optional(db).await?;
+    ).bind(market.id).bind(tick_index as i32).fetch_optional(db).await?;
     println!("handle_create_active_tick active tick: {:?}", active_tick);
     match active_tick{
         Some(tick) =>{
@@ -431,5 +418,52 @@ pub async fn handle_create_active_tick(
             ).execute(db).await?;
         }
     }
+    Ok(())
+}
+
+pub async fn create_swap_transaction(
+    user_address: Address,
+    token_in_address: Address,
+    token_out_address: Address,
+    amm_market_address: Address,
+    amm_market_account: Account,
+    amount_in: u64,
+    amount_out: u64,
+) -> anyhow::Result<()>{
+    let db: &sqlx::Pool<sqlx::Postgres> = get_pg().await;
+    let amm_market_data = AMMAccount::unpack_from_slice(&amm_market_account.data)?;
+    let decoded_amm_market = match amm_market_data{
+        AMMAccount::Uninitialized => {
+            return Err(anyhow!("Error: Failed to deserialize counter account data"));
+        }
+        AMMAccount::Initialized { 
+            pool_authority: _, 
+            token_a_mint: _, 
+            token_b_mint: _, 
+            token_a_pool: _, 
+            token_b_pool: _, 
+            sqrt_price_a_by_b, 
+            current_tick: _, 
+            active_liquidity: _, 
+            fee_growth: _, 
+            protocol_fee: _ } =>{
+
+                let user = get_or_create_user(User { id: user_address.to_string(), username: user_address.to_string() }).await?;
+                
+                let market = sqlx::query_as::<_, Market>("SELECT * FROM markets WHERE market_address = $1;").bind(amm_market_address.to_string()).fetch_one(db).await?;
+                
+                let tx_insert_res = sqlx::query!(
+                    "INSERT INTO transactions VALUES (DEFAULT, $1, $2, $3, $4, $5, DEFAULT, DEFAULT, $6, $7, DEFAULT);",
+                    user.id,
+                    token_in_address.to_string(),
+                    token_out_address.to_string(),
+                    amount_in as i64,
+                    amount_out as i64,
+                    market.id,
+                    sqrt_price_a_by_b.to_string()
+                ).execute(db).await?;
+                println!("tx insert result: {:?}", tx_insert_res);
+            }
+        };
     Ok(())
 }

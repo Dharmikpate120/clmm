@@ -1,0 +1,4 @@
+[build.env]
+passthrough = [
+    "OPENSSL_VENDORED",
+]

@@ -1,40 +1,36 @@
-use std::{ slice::Iter };
+use std::{cell::Ref, slice::Iter};
 
 use crate::{
     bitmap::{
         bitmaphelper::{
-            activate_bit,
-            check_bit_status_u8,
-            deactivate_bit,
-            get_bitarray_index,
-            get_tail,
+            activate_bit, check_bit_status_u8, deactivate_bit, get_bitarray_index, get_tail,
         },
         bitmapstate::Bitmap,
     },
     delta::delta_helper::{
-        price_with_a_and_liquidity,
-        price_with_b_and_liquidity,
-        token_price_with_constant_liquidity,
+        delta_a_from_delta_p, delta_b_from_delta_p, lower_price_from_delta_b,
+        price_with_a_and_liquidity, price_with_b_and_liquidity,
+        token_price_with_constant_liquidity_by_a, token_price_with_constant_liquidity_by_b,
+        upper_price_from_delta_a,
     },
     error::AMMError,
     formulas::{
-        calculate_delta_a,
-        calculate_delta_b,
-        price_to_tick_index,
-        q6464_sqrt_to_value,
-        tick_index_to_price,
-        value_to_sqrt_q6464,
+        calculate_delta_a, calculate_delta_b, price_to_tick_index, q6464_sqrt_to_value,
+        tick_index_to_price, value_to_sqrt_q6464,
     },
-    state::{ AMMAccount, PositionAccount, TICK_ARRAY_SIZE },
+    state::{AMMAccount, PositionAccount, TICK_ARRAY_SIZE},
     tick::tick_helper::update_tick_with_index,
     tick_state::TickArray,
     utils::get_active_ticks,
 };
 // use mpl_core::types::DataState;
+use borsh::{BorshDeserialize, BorshSerialize};
+use num_traits::Float;
+use solana_program::program_pack::Pack;
 use solana_program::{
-    account_info::{ AccountInfo, next_account_info },
+    account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
-    instruction::{ AccountMeta },
+    instruction::AccountMeta,
     msg,
     program::invoke,
     program_pack::IsInitialized,
@@ -42,10 +38,8 @@ use solana_program::{
     rent::Rent,
     sysvar::Sysvar,
 };
-use solana_program::program_pack::Pack;
 use solana_program_error::ProgramError;
 use spl_token_interface::state::AccountState;
-use borsh::{ BorshDeserialize, BorshSerialize };
 pub struct Processor;
 
 impl Processor {
@@ -55,7 +49,7 @@ impl Processor {
         token_a_amount: u64,
         token_b_amount: u64,
         start_tick: u32,
-        end_tick: u32
+        end_tick: u32,
     ) -> ProgramResult {
         let account_iter = &mut accounts.iter();
 
@@ -148,11 +142,13 @@ impl Processor {
 
         //verifying accounts access--------------------------------------------------------------------------------------
         if admin_account.is_signer == false {
+            #[cfg(debug_assertions)]
             msg!("Error: Admin account is not a signer");
             return Err(AMMError::InvalidSigner.into());
         }
 
         if *system_program_account.key != solana_system_interface::program::ID {
+            #[cfg(debug_assertions)]
             msg!(
                 "Error: System program account is invalid: {:?}",
                 solana_system_interface::program::ID
@@ -161,6 +157,7 @@ impl Processor {
         }
 
         if *spl_token_program_account.key != spl_token_interface::id() {
+            #[cfg(debug_assertions)]
             msg!("Error: SPL token program account is invalid");
             return Err(AMMError::InvalidSPLTokenProgram.into());
         }
@@ -168,88 +165,106 @@ impl Processor {
         //     msg!("Error: Metaplex core program account is invalid");
         //     return Err(AMMError::InvalidMPL_CoreProgram.into());
         // }
-        if admin_token_a_account.is_writable == false || admin_token_b_account.is_writable == false {
+        if admin_token_a_account.is_writable == false || admin_token_b_account.is_writable == false
+        {
+            #[cfg(debug_assertions)]
             msg!("Error: Admin token A account is not writable");
             return Err(AMMError::NotWritable.into());
         }
 
         if token_a_pool_account.is_writable == false || token_b_pool_account.is_writable == false {
+            #[cfg(debug_assertions)]
             msg!("Error: Token pool accounts are not writable!");
             return Err(AMMError::NotWritable.into());
         }
         if amm_token_account.is_writable == false {
+            #[cfg(debug_assertions)]
             msg!("Error: AMM token accoutn is not writable!");
             return Err(AMMError::NotWritable.into());
         }
 
         if nft_mint_account.is_writable == false {
+            #[cfg(debug_assertions)]
             msg!("Error: nft mint account is not writable");
             return Err(AMMError::NotWritable.into());
         }
 
         if position_account.is_writable == false {
+            #[cfg(debug_assertions)]
             msg!("Error: position account is not writable");
             return Err(AMMError::NotWritable.into());
         }
-        if
-            first_tick_array_account.is_writable == false ||
-            last_tick_array_account.is_writable == false
+        if first_tick_array_account.is_writable == false
+            || last_tick_array_account.is_writable == false
         {
+            #[cfg(debug_assertions)]
             msg!("Error: tick array account is not writable");
             return Err(AMMError::NotWritable.into());
         }
 
-        //verifying accounts data--------------------------------------------------------------------------------------
+        //verifying accounts data --------------------------------------------------------------------------------------
+        #[cfg(debug_assertions)]
         msg!("1");
         let admin_token_a_data = spl_token_interface::state::Account::unpack_from_slice(
-            admin_token_a_account.data.borrow().as_ref()
+            admin_token_a_account.data.borrow().as_ref(),
         )?;
         if admin_token_a_data.is_frozen() {
+            #[cfg(debug_assertions)]
             msg!("Error: Admin token A account is frozen");
             return Err(AMMError::TokenAccountFrozen.into());
         }
         if admin_token_a_data.state != AccountState::Initialized {
+            #[cfg(debug_assertions)]
             msg!("Error: Admin token A account is not initialized");
             return Err(AMMError::TokenAccountFrozen.into());
         }
 
         let admin_token_b_data = spl_token_interface::state::Account::unpack_from_slice(
-            admin_token_b_account.data.borrow().as_ref()
+            admin_token_b_account.data.borrow().as_ref(),
         )?;
         if admin_token_b_data.is_frozen() {
+            #[cfg(debug_assertions)]
             msg!("Error: Admin token A account is frozen");
             return Err(AMMError::TokenAccountFrozen.into());
         }
         if admin_token_b_data.state != AccountState::Initialized {
+            #[cfg(debug_assertions)]
             msg!("Error: Admin token A account is not initialized");
             return Err(AMMError::TokenAccountNotInitialized.into());
         }
 
-        if admin_token_a_data.amount < token_a_amount || admin_token_b_data.amount < token_b_amount {
+        if admin_token_a_data.amount < token_a_amount || admin_token_b_data.amount < token_b_amount
+        {
+            #[cfg(debug_assertions)]
             msg!("Error: Insufficient token balance in admin account");
             return Err(AMMError::InsufficientTokenBalance.into());
         }
 
         if *token_a_mint_account.key != admin_token_a_data.mint {
+            #[cfg(debug_assertions)]
             msg!("Error: Admin token A account mint does not match provided token A mint account");
             return Err(AMMError::InvalidMintAccount.into());
         }
         if *token_b_mint_account.key != admin_token_b_data.mint {
+            #[cfg(debug_assertions)]
             msg!("Error: Admin token B account mint does not match provided token B mint account");
             return Err(AMMError::InvalidMintAccount.into());
         }
+        #[cfg(debug_assertions)]
         msg!("2");
         //initializing amm pool account--------------------------------------------------------------------------------------
         //validating amm token account
         let (amm_token_account_pda, amm_token_account_bump) = get_lexicographical_token_pda(
             token_a_mint_account.key,
             token_b_mint_account.key,
-            program_id
+            program_id,
         );
         if amm_token_account_pda != *amm_token_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid AMM token account provided.");
             return Err(AMMError::InvalidAMMTokenAccount.into());
         }
+        #[cfg(debug_assertions)]
         msg!("3");
         //creating and initializing amm pool account
         initialize_amm_pool_account(
@@ -262,16 +277,21 @@ impl Processor {
             token_a_mint_account.key,
             token_b_mint_account.key,
             token_a_pool_account.key,
-            token_b_pool_account.key
+            token_b_pool_account.key,
         )?;
         //INITIALIZE BITMAP ARRAY ACCOUNTS
         let start_bitmap_index = start_tick / 10000;
         let end_bitmap_index = end_tick / 10000;
+        #[cfg(debug_assertions)]
         msg!("4");
         if start_bitmap_index == end_bitmap_index {
             let (start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
-                &[b"bitmap", &start_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
-                amm_program_account.key
+                &[
+                    b"bitmap",
+                    &start_bitmap_index.to_be_bytes(),
+                    amm_token_account_pda.as_array(),
+                ],
+                amm_program_account.key,
             );
             // asdfghjkl;'
             initialize_bitmap_account(
@@ -282,17 +302,31 @@ impl Processor {
                 amm_program_account,
                 &amm_token_account_pda,
                 start_bitmap_index,
-                program_id
+                program_id,
             )?;
+            activate_bit(
+                &mut start_bitmap_account.data.borrow_mut(),
+                start_tick as u64,
+            );
+            activate_bit(&mut start_bitmap_account.data.borrow_mut(), end_tick as u64);
         } else {
+            #[cfg(debug_assertions)]
             msg!("3");
             let (_start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
-                &[b"bitmap", &start_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
-                amm_program_account.key
+                &[
+                    b"bitmap",
+                    &start_bitmap_index.to_be_bytes(),
+                    amm_token_account_pda.as_array(),
+                ],
+                amm_program_account.key,
             );
             let (_end_bitmap_address, end_bitmap_account_bump) = Pubkey::find_program_address(
-                &[b"bitmap", &end_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
-                amm_program_account.key
+                &[
+                    b"bitmap",
+                    &end_bitmap_index.to_be_bytes(),
+                    amm_token_account_pda.as_array(),
+                ],
+                amm_program_account.key,
             );
             // asdfghjkl;'
             initialize_bitmap_account(
@@ -303,7 +337,7 @@ impl Processor {
                 amm_program_account,
                 &amm_token_account_pda,
                 start_bitmap_index,
-                program_id
+                program_id,
             )?;
             // asdfghjkl;'
             initialize_bitmap_account(
@@ -314,33 +348,49 @@ impl Processor {
                 amm_program_account,
                 &amm_token_account_pda,
                 end_bitmap_index,
-                program_id
+                program_id,
             )?;
-            activate_bit(&mut start_bitmap_account.data.borrow_mut(), start_tick as u64);
+            activate_bit(
+                &mut start_bitmap_account.data.borrow_mut(),
+                start_tick as u64,
+            );
             activate_bit(&mut end_bitmap_account.data.borrow_mut(), end_tick as u64);
         }
+        #[cfg(debug_assertions)]
         msg!("5");
         //INITIALIZING TOKEN POOL ACCOUNTS--------------------------------------------------------------------------------------
         //validating token a pool account
         let (token_a_pool_account_pda, token_a_pool_account_bump) = Pubkey::find_program_address(
-            &[b"pool", amm_token_account_pda.as_array(), token_a_mint_account.key.as_array()],
-            program_id
+            &[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_a_mint_account.key.as_array(),
+            ],
+            program_id,
         );
         if token_a_pool_account_pda != *token_a_pool_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid token A pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
+        #[cfg(debug_assertions)]
         msg!("5.1");
         //validating token b pool account
         let (token_b_pool_account_pda, token_b_pool_account_bump) = Pubkey::find_program_address(
-            &[b"pool", amm_token_account_pda.as_array(), token_b_mint_account.key.as_array()],
-            program_id
+            &[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_b_mint_account.key.as_array(),
+            ],
+            program_id,
         );
         if token_b_pool_account_pda != *token_b_pool_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid token B pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
 
+        #[cfg(debug_assertions)]
         msg!("5.1");
         // asdfghjkl;'
         initialize_token_pool_accounts(
@@ -357,8 +407,9 @@ impl Processor {
             token_b_pool_account_bump,
             amm_token_account,
             sysvar_rent_account,
-            amm_program_account
+            amm_program_account,
         )?;
+        #[cfg(debug_assertions)]
         msg!("6");
         //Creating NFT accounts--------------------------------------------------------------------------------------
         //asdfghjkl;'
@@ -366,35 +417,38 @@ impl Processor {
             nft_mint_account,
             admin_account,
             system_program_account,
-            metaplex_core_program_account
+            metaplex_core_program_account,
         )?;
 
         //move this below the calculation to directly set the state asdfghjkl;
         //Creating Position Account--------------------------------------------------------------------------------------
         let mut pa_seeds: Vec<&[u8]> = vec![nft_mint_account.key.as_array()];
+        #[cfg(debug_assertions)]
         msg!("7");
         let (position_account_pda, position_account_bump) = Pubkey::find_program_address(
             get_lexicographical_tokens_addresses(
                 token_a_mint_account.key,
                 token_b_mint_account.key,
-                &mut pa_seeds
+                &mut pa_seeds,
             ),
-            amm_program_account.key
+            amm_program_account.key,
         );
         if position_account_pda != *position_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid position account provided.");
             return Err(AMMError::InvalidPositionAccount.into());
         }
 
         //collecting token a and token b in pool account--------------------------------------------------------------------------------------
-        let token_a_admin_to_pool_transfer_instruction = spl_token_interface::instruction::transfer(
-            spl_token_program_account.key,
-            admin_token_a_account.key,
-            token_a_pool_account.key,
-            admin_account.key,
-            &[admin_account.key],
-            token_a_amount
-        )?;
+        let token_a_admin_to_pool_transfer_instruction =
+            spl_token_interface::instruction::transfer(
+                spl_token_program_account.key,
+                admin_token_a_account.key,
+                token_a_pool_account.key,
+                admin_account.key,
+                &[admin_account.key],
+                token_a_amount,
+            )?;
         solana_program::program::invoke(
             &token_a_admin_to_pool_transfer_instruction,
             &[
@@ -402,17 +456,19 @@ impl Processor {
                 admin_token_a_account.clone(),
                 token_a_pool_account.clone(),
                 admin_account.clone(),
-            ]
+            ],
         )?;
+        #[cfg(debug_assertions)]
         msg!("8");
-        let token_b_admin_to_pool_transfer_instruction = spl_token_interface::instruction::transfer(
-            spl_token_program_account.key,
-            admin_token_b_account.key,
-            token_b_pool_account.key,
-            admin_account.key,
-            &[admin_account.key],
-            token_b_amount
-        )?;
+        let token_b_admin_to_pool_transfer_instruction =
+            spl_token_interface::instruction::transfer(
+                spl_token_program_account.key,
+                admin_token_b_account.key,
+                token_b_pool_account.key,
+                admin_account.key,
+                &[admin_account.key],
+                token_b_amount,
+            )?;
         solana_program::program::invoke(
             &token_b_admin_to_pool_transfer_instruction,
             &[
@@ -420,21 +476,24 @@ impl Processor {
                 admin_token_b_account.clone(),
                 token_b_pool_account.clone(),
                 admin_account.clone(),
-            ]
+            ],
         )?;
+        #[cfg(debug_assertions)]
         msg!("9");
         //calculate the initial price is between start and end tick of the provided range and create start tick and end tick array accounts set the active liquidity accordingly based on the start and end tick
         let price_a_by_b = (token_a_amount as f64) / (token_b_amount as f64);
 
         let current_tick = price_to_tick_index(price_a_by_b);
+        #[cfg(debug_assertions)]
         msg!("{}", current_tick);
         if current_tick < (start_tick as u32) || current_tick > (end_tick as u32) {
+            #[cfg(debug_assertions)]
             msg!("Error : Initial price is not in between the provided tick range.");
             return Err(AMMError::InitialPriceOutOfRange.into());
         }
-        let active_liquidity = value_to_sqrt_q6464(
-            ((token_a_amount as f64) * (token_b_amount as f64)).sqrt()
-        );
+        let active_liquidity =
+            value_to_sqrt_q6464(((token_a_amount as f64) * (token_b_amount as f64)).sqrt());
+        #[cfg(debug_assertions)]
         msg!("1");
         // asdfghjkl;'
         initialize_position_account(
@@ -448,8 +507,9 @@ impl Processor {
             position_account_bump,
             start_tick,
             end_tick,
-            active_liquidity
+            active_liquidity,
         )?;
+        #[cfg(debug_assertions)]
         msg!("2");
         // asdfghjkl;'
         initialize_tick_array_accounts(
@@ -461,11 +521,13 @@ impl Processor {
             amm_token_account,
             start_tick,
             end_tick,
-            (token_a_amount as f64) * (token_b_amount as f64)
+            (token_a_amount as f64) * (token_b_amount as f64),
         )?;
 
         let q6464_sqrt_price = value_to_sqrt_q6464(price_a_by_b);
+        #[cfg(debug_assertions)]
         msg!("3");
+        #[cfg(debug_assertions)]
         msg!("{:?}", amm_token_account.owner);
         // updating data of amm token account
         let updated_amm_token_account_data = AMMAccount::Initialized {
@@ -490,7 +552,7 @@ impl Processor {
         accounts: &[AccountInfo],
         liquidity: f64,
         start_tick: u32,
-        end_tick: u32
+        end_tick: u32,
     ) -> ProgramResult {
         let accounts_iter = &mut accounts.iter();
 
@@ -556,34 +618,46 @@ impl Processor {
 
         //17. end_bitmap_account
         let end_bitmap_account = next_account_info(accounts_iter)?;
+        #[cfg(debug_assertions)]
         msg!("1");
         //validating amm token account
         let (amm_token_account_pda, _amm_token_account_bump) = get_lexicographical_token_pda(
             token_a_mint_account.key,
             token_b_mint_account.key,
-            program_id
+            program_id,
         );
         if amm_token_account_pda != *amm_token_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid AMM token account provided.");
             return Err(AMMError::InvalidAMMTokenAccount.into());
         }
 
         //validating token a pool account
         let (token_a_pool_account_pda, _token_a_pool_account_bump) = Pubkey::find_program_address(
-            &[b"pool", amm_token_account_pda.as_array(), token_a_mint_account.key.as_array()],
-            program_id
+            &[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_a_mint_account.key.as_array(),
+            ],
+            program_id,
         );
         if token_a_pool_account_pda != *amm_token_a_pool_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid token A pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
 
         //validating token b pool account
         let (token_b_pool_account_pda, _token_b_pool_account_bump) = Pubkey::find_program_address(
-            &[b"pool", amm_token_account_pda.as_array(), token_b_mint_account.key.as_array()],
-            program_id
+            &[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_b_mint_account.key.as_array(),
+            ],
+            program_id,
         );
         if token_b_pool_account_pda != *amm_token_b_pool_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid token B pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
@@ -592,12 +666,18 @@ impl Processor {
         let start_bitmap_index = start_tick / 10000;
         let end_bitmap_index = end_tick / 10000;
 
+        #[cfg(debug_assertions)]
         msg!("2");
         if start_bitmap_index == end_bitmap_index {
+            #[cfg(debug_assertions)]
             msg!("2.1");
             let (_start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
-                &[b"bitmap", &start_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
-                amm_program_account.key
+                &[
+                    b"bitmap",
+                    &start_bitmap_index.to_be_bytes(),
+                    amm_token_account_pda.as_array(),
+                ],
+                amm_program_account.key,
             );
             initialize_bitmap_account(
                 start_bitmap_account,
@@ -607,17 +687,26 @@ impl Processor {
                 amm_program_account,
                 &amm_token_account_pda,
                 start_bitmap_index,
-                program_id
+                program_id,
             )?;
         } else {
+            #[cfg(debug_assertions)]
             msg!("2.2");
             let (_start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
-                &[b"bitmap", &start_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
-                amm_program_account.key
+                &[
+                    b"bitmap",
+                    &start_bitmap_index.to_be_bytes(),
+                    amm_token_account_pda.as_array(),
+                ],
+                amm_program_account.key,
             );
             let (_end_bitmap_address, end_bitmap_account_bump) = Pubkey::find_program_address(
-                &[b"bitmap", &end_bitmap_index.to_be_bytes(), amm_token_account_pda.as_array()],
-                amm_program_account.key
+                &[
+                    b"bitmap",
+                    &end_bitmap_index.to_be_bytes(),
+                    amm_token_account_pda.as_array(),
+                ],
+                amm_program_account.key,
             );
             initialize_bitmap_account(
                 start_bitmap_account,
@@ -627,7 +716,7 @@ impl Processor {
                 amm_program_account,
                 &amm_token_account_pda,
                 start_bitmap_index,
-                program_id
+                program_id,
             )?;
             initialize_bitmap_account(
                 end_bitmap_account,
@@ -637,46 +726,53 @@ impl Processor {
                 amm_program_account,
                 &amm_token_account_pda,
                 end_bitmap_index,
-                program_id
+                program_id,
             )?;
         }
-        activate_bit(&mut start_bitmap_account.data.borrow_mut(), start_tick as u64);
+        activate_bit(
+            &mut start_bitmap_account.data.borrow_mut(),
+            start_tick as u64,
+        );
         activate_bit(&mut end_bitmap_account.data.borrow_mut(), end_tick as u64);
         //Creating NFT accounts--------------------------------------------------------------------------------------
+        #[cfg(debug_assertions)]
         msg!("3");
         //asdfghjkl;'
         initialize_nft_accounts(
             nft_mint_account,
             liquidity_provider_account,
             system_program_account,
-            metaplex_core_program_account
+            metaplex_core_program_account,
         )?;
         //calculations starts ------------------------------------------------------------
+        #[cfg(debug_assertions)]
         msg!("4");
-        let amm_token_account_data = AMMAccount::unpack_from_slice(
-            &amm_token_account.data.borrow()
-        )?;
+        let amm_token_account_data =
+            AMMAccount::unpack_from_slice(&amm_token_account.data.borrow())?;
         let start_price = tick_index_to_price(start_tick);
         let end_price = tick_index_to_price(end_tick);
 
         let AMMAccount::Initialized {
-            pool_authority: _,
-            token_a_mint: _,
-            token_b_mint: _,
-            token_a_pool: _,
-            token_b_pool: _,
+            pool_authority,
+            token_a_mint,
+            token_b_mint,
+            token_a_pool,
+            token_b_pool,
             sqrt_price_a_by_b,
-            current_tick: _,
-            active_liquidity: _,
-            fee_growth: _,
-            protocol_fee: _,
-        } = amm_token_account_data else {
+            current_tick,
+            active_liquidity,
+            fee_growth,
+            protocol_fee,
+        } = amm_token_account_data
+        else {
+            #[cfg(debug_assertions)]
             msg!("Amm token account not initialized!");
             return Err(AMMError::AccountNotInitialized.into());
         };
         let current_price = q6464_sqrt_to_value(sqrt_price_a_by_b);
         let mut delta_a: f64 = 0 as f64;
         let mut delta_b: f64 = 0 as f64;
+        #[cfg(debug_assertions)]
         msg!(
             "5 current_price: {:?}, start_price: {:?}, end_price: {:?}, liquidity: {:?}",
             current_price,
@@ -684,6 +780,7 @@ impl Processor {
             end_price,
             liquidity
         );
+
         if current_price < start_price {
             delta_b = calculate_delta_b(start_price, end_price, liquidity);
         }
@@ -695,20 +792,40 @@ impl Processor {
             delta_a = calculate_delta_b(start_price, current_price, liquidity);
 
             delta_b = calculate_delta_b(current_price, end_price, liquidity);
+
+            let updated_amm_data = AMMAccount::Initialized {
+                pool_authority,
+                token_a_mint,
+                token_b_mint,
+                token_a_pool,
+                token_b_pool,
+                sqrt_price_a_by_b,
+                current_tick,
+                active_liquidity: value_to_sqrt_q6464(
+                    q6464_sqrt_to_value(active_liquidity) + liquidity,
+                ),
+                fee_growth,
+                protocol_fee,
+            };
+            #[cfg(debug_assertions)]
+            msg!("new amm data: {:?}", updated_amm_data);
+            updated_amm_data.pack_into_slice(&mut amm_token_account.data.borrow_mut());
         }
         let mut position_seeds: Vec<&[u8]> = vec![nft_mint_account.key.as_array()];
         let (position_account_pda, position_account_bump) = Pubkey::find_program_address(
             get_lexicographical_tokens_addresses(
                 token_a_mint_account.key,
                 token_b_mint_account.key,
-                &mut position_seeds
+                &mut position_seeds,
             ),
-            amm_program_account.key
+            amm_program_account.key,
         );
         if position_account_pda != *position_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid position account provided.");
             return Err(AMMError::InvalidPositionAccount.into());
         }
+        #[cfg(debug_assertions)]
         msg!("6");
         //asdfghjkl;'
         initialize_position_account(
@@ -722,8 +839,9 @@ impl Processor {
             position_account_bump,
             start_tick,
             end_tick,
-            value_to_sqrt_q6464(liquidity)
+            value_to_sqrt_q6464(liquidity),
         )?;
+        #[cfg(debug_assertions)]
         msg!("7");
         //asdfghjkl;'
         initialize_tick_array_accounts(
@@ -735,8 +853,9 @@ impl Processor {
             amm_token_account,
             start_tick,
             end_tick,
-            liquidity
+            liquidity,
         )?;
+        #[cfg(debug_assertions)]
         msg!("8");
         //withdrawing token a from provider to pool
         let token_a_transfer_instruction = spl_token_interface::instruction::transfer(
@@ -745,8 +864,7 @@ impl Processor {
             amm_token_a_pool_account.key,
             liquidity_provider_account.key,
             &[liquidity_provider_account.key],
-            delta_a.ceil() as u64
-            // calculated_amount_a
+            delta_a.ceil() as u64, // calculated_amount_a
         )?;
         solana_program::program::invoke(
             &token_a_transfer_instruction,
@@ -755,9 +873,11 @@ impl Processor {
                 provider_token_a_account.clone(),
                 amm_token_a_pool_account.clone(),
                 liquidity_provider_account.clone(),
-            ]
+            ],
         )?;
+        #[cfg(debug_assertions)]
         msg!("9");
+        #[cfg(debug_assertions)]
         msg!("delta b: {:?}, delta a: {:?}", delta_b, delta_a);
         //withdrawing token b from provider to pool
         let token_b_transfer_instruction = spl_token_interface::instruction::transfer(
@@ -766,8 +886,7 @@ impl Processor {
             amm_token_b_pool_account.key,
             liquidity_provider_account.key,
             &[liquidity_provider_account.key],
-            delta_b.ceil() as u64
-            // calculated_amount_b
+            delta_b.ceil() as u64, // calculated_amount_b
         )?;
         solana_program::program::invoke(
             &token_b_transfer_instruction,
@@ -776,7 +895,7 @@ impl Processor {
                 provider_token_b_account.clone(),
                 amm_token_b_pool_account.clone(),
                 liquidity_provider_account.clone(),
-            ]
+            ],
         )?;
 
         Ok(())
@@ -785,7 +904,7 @@ impl Processor {
     pub fn withdraw_liquidity(
         program_id: &Pubkey,
         accounts: &[AccountInfo],
-        minimum_liquidity: u64
+        minimum_liquidity: u64,
     ) -> ProgramResult {
         let accounts_iter = &mut accounts.iter();
 
@@ -851,87 +970,95 @@ impl Processor {
         let end_bitmap_account = next_account_info(accounts_iter)?;
 
         //validating amm token account
+        #[cfg(debug_assertions)]
         msg!("1");
         let (amm_token_account_pda, _amm_token_account_bump) = get_lexicographical_token_pda(
             token_a_mint_account.key,
             token_b_mint_account.key,
-            program_id
+            program_id,
         );
         if amm_token_account_pda != *amm_token_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid AMM token account provided.");
             return Err(AMMError::InvalidAMMTokenAccount.into());
         }
+        #[cfg(debug_assertions)]
         msg!("2");
         //validating token a pool account
         let (token_a_pool_account_pda, token_a_pool_account_bump) = Pubkey::find_program_address(
-            &[b"pool", amm_token_account_pda.as_array(), token_a_mint_account.key.as_array()],
-            program_id
+            &[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_a_mint_account.key.as_array(),
+            ],
+            program_id,
         );
         if token_a_pool_account_pda != *amm_token_a_pool_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid token A pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
 
         //validating token b pool account
         let (token_b_pool_account_pda, token_b_pool_account_bump) = Pubkey::find_program_address(
-            &[b"pool", amm_token_account_pda.as_array(), token_b_mint_account.key.as_array()],
-            program_id
+            &[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_b_mint_account.key.as_array(),
+            ],
+            program_id,
         );
         if token_b_pool_account_pda != *amm_token_b_pool_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid token B pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
+        #[cfg(debug_assertions)]
         msg!("3");
         // calculating the delta a and delta b based on the withdrawn liquidity
         let mut delta_a = 0 as f64;
         let mut delta_b = 0 as f64;
         // msg!("amm account: {:?}", amm_token_account.data);
-        let amm_token_account_deserialized = AMMAccount::unpack_from_slice(
-            &amm_token_account.data.borrow()
-        )?;
+        let amm_token_account_deserialized =
+            AMMAccount::unpack_from_slice(&amm_token_account.data.borrow())?;
         // msg!("amm deserialized!: {:?}", amm_token_account_deserialized);
-        let sqrt_price_a_by_b = match amm_token_account_deserialized {
-            AMMAccount::Initialized {
-                pool_authority: _,
-                token_a_mint: _,
-                token_b_mint: _,
-                token_a_pool: _,
-                token_b_pool: _,
-                sqrt_price_a_by_b,
-                current_tick: _,
-                active_liquidity: _,
-                fee_growth: _,
-                protocol_fee: _,
-            } => {
-                sqrt_price_a_by_b
-            }
-            _ => {
-                return Err(AMMError::AccountNotInitialized.into());
-            }
+        let AMMAccount::Initialized {
+            pool_authority,
+            token_a_mint,
+            token_b_mint,
+            token_a_pool,
+            token_b_pool,
+            sqrt_price_a_by_b,
+            current_tick,
+            active_liquidity,
+            fee_growth,
+            protocol_fee,
+        } = amm_token_account_deserialized
+        else {
+            return Err(AMMError::AccountNotInitialized.into());
         };
-        // msg!("position_account key: {:?}, pda: {:?}", position_account.key, _position_account_pda);
-        msg!(
-            "position: {:?}, len: {:?}",
-            position_account.data.borrow(),
-            position_account.data.borrow().len()
-        );
-        let position_account_data = PositionAccount::unpack_from_slice(
-            &position_account.data.borrow()
-        )?;
+
+        let position_account_data =
+            PositionAccount::unpack_from_slice(&position_account.data.borrow())?;
+        #[cfg(debug_assertions)]
+        msg!("position account data: {:?}", position_account_data);
         let (start_tick, end_tick, liquidity) = match position_account_data {
-            PositionAccount::Initialized { start_tick, end_tick, liquidity } => {
-                (start_tick, end_tick, liquidity)
-            }
+            PositionAccount::Initialized {
+                start_tick,
+                end_tick,
+                liquidity,
+            } => (start_tick, end_tick, liquidity),
             _ => {
                 return Err(AMMError::AccountNotInitialized.into());
             }
         };
         let f64_liquidity = q6464_sqrt_to_value(liquidity);
-        msg!("4");
-        msg!("error :{}, {}", f64_liquidity, minimum_liquidity);
 
         //validating the liquidity and if min-0 then withdrawing all
-        if f64_liquidity < (minimum_liquidity as f64) {
+        if f64_liquidity - (minimum_liquidity as f64) > 0.1
+            && f64_liquidity - (minimum_liquidity as f64) < 1.0
+        {
+            #[cfg(debug_assertions)]
             msg!("error :{}, {}", f64_liquidity, minimum_liquidity);
             return Err(AMMError::InsufficientTokenBalance.into());
         }
@@ -948,25 +1075,38 @@ impl Processor {
         } else if end_price < current_price_f64 {
             delta_a = calculate_delta_a(start_price, end_price, withdraw_amount);
         } else {
+            // updating the active liquidity if the price is in the withdraw range
+            let updated_amm_data = AMMAccount::Initialized {
+                pool_authority,
+                token_a_mint,
+                token_b_mint,
+                token_a_pool,
+                token_b_pool,
+                sqrt_price_a_by_b,
+                current_tick,
+                active_liquidity: value_to_sqrt_q6464(
+                    q6464_sqrt_to_value(active_liquidity) - withdraw_amount,
+                ),
+                fee_growth,
+                protocol_fee,
+            };
+            #[cfg(debug_assertions)]
+            msg!("new amm data: {:?}", updated_amm_data);
+            updated_amm_data.pack_into_slice(&mut amm_token_account.data.borrow_mut());
             delta_a = calculate_delta_a(start_price, current_price_f64, withdraw_amount);
             delta_b = calculate_delta_b(current_price_f64, end_price, withdraw_amount);
         }
+        #[cfg(debug_assertions)]
         msg!("5");
         // invoke the spl - transfer to withdraw token a and token b from the pool to provider
         let token_a_decimals = spl_token_interface::state::Mint::unpack_from_slice(
-            &token_a_mint_account.data.borrow()
-        )?.decimals as f64;
+            &token_a_mint_account.data.borrow(),
+        )?
+        .decimals as f64;
         let token_b_decimals = spl_token_interface::state::Mint::unpack_from_slice(
-            &token_b_mint_account.data.borrow()
-        )?.decimals as f64;
-
-        msg!(
-            "6, delta_a: {:?}, d: {:?}, delta_b: {:?}, d: {:?}",
-            delta_a,
-            token_a_decimals,
-            delta_b,
-            token_b_decimals
-        );
+            &token_b_mint_account.data.borrow(),
+        )?
+        .decimals as f64;
 
         //withdrawing token a from pool to provider
         let token_a_transfer_instruction = spl_token_interface::instruction::transfer(
@@ -975,7 +1115,7 @@ impl Processor {
             provider_token_a_account.key,
             amm_token_a_pool_account.key,
             &[amm_token_a_pool_account.key],
-            delta_a.floor() as u64
+            delta_a.floor() as u64,
         )?;
         solana_program::program::invoke_signed(
             &token_a_transfer_instruction,
@@ -985,22 +1125,13 @@ impl Processor {
                 provider_token_a_account.clone(),
                 amm_token_a_pool_account.clone(),
             ],
-            &[
-                &[
-                    b"pool",
-                    amm_token_account_pda.as_array(),
-                    token_a_mint_account.key.as_array(),
-                    &[token_a_pool_account_bump],
-                ],
-            ]
+            &[&[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_a_mint_account.key.as_array(),
+                &[token_a_pool_account_bump],
+            ]],
         )?;
-        msg!(
-            "6, delta_a: {:?}, d: {:?}, delta_b: {:?}, d: {:?}",
-            delta_a,
-            token_a_decimals,
-            delta_b,
-            token_b_decimals
-        );
         //withdrawing token b from pool to provider
         let token_b_transfer_instruction = spl_token_interface::instruction::transfer(
             spl_token_account.key,
@@ -1008,7 +1139,7 @@ impl Processor {
             provider_token_b_account.key,
             amm_token_b_pool_account.key,
             &[amm_token_b_pool_account.key],
-            delta_b.floor() as u64
+            delta_b.floor() as u64,
         )?;
         solana_program::program::invoke_signed(
             &token_b_transfer_instruction,
@@ -1018,15 +1149,14 @@ impl Processor {
                 provider_token_b_account.clone(),
                 amm_token_b_pool_account.clone(),
             ],
-            &[
-                &[
-                    b"pool",
-                    amm_token_account_pda.as_array(),
-                    token_b_mint_account.key.as_array(),
-                    &[token_b_pool_account_bump],
-                ],
-            ]
+            &[&[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_b_mint_account.key.as_array(),
+                &[token_b_pool_account_bump],
+            ]],
         )?;
+        #[cfg(debug_assertions)]
         msg!("7");
         // update the ticks with net liquidity
         // msg!(
@@ -1040,72 +1170,57 @@ impl Processor {
         //     last_tick_array_account.data.borrow().len(),
         //     TickArray::LEN
         // );
-        let mut start_tick_account = first_tick_array_account.data.borrow_mut();
-        msg!("7.1");
-        let mut end_tick_account = last_tick_array_account.data.borrow_mut();
+        {
+            let mut start_tick_account = first_tick_array_account.data.borrow_mut();
+            #[cfg(debug_assertions)]
+            msg!("7.1");
+            let mut end_tick_account = last_tick_array_account.data.borrow_mut();
 
-        update_tick_with_index(
-            &mut start_tick_account,
-            start_tick,
-            withdraw_amount.floor() as u64,
-            false
-        );
-        update_tick_with_index(
-            &mut end_tick_account,
-            end_tick,
-            withdraw_amount.floor() as u64,
-            true
-        );
+            update_tick_with_index(
+                &mut start_tick_account,
+                start_tick,
+                withdraw_amount.floor() as u64,
+                false,
+            );
+            update_tick_with_index(
+                &mut end_tick_account,
+                end_tick,
+                withdraw_amount.floor() as u64,
+                true,
+            );
+        }
+        #[cfg(debug_assertions)]
         msg!("7.2");
-        // if !start_tick_account.is_initialized() || !end_tick_account.is_initialized() {
-        //     msg!("start_tick_account OR end_tick_account is not initialized!");
-        //     return Err(AMMError::AccountNotInitialized.into());
-        // }
 
-        // let start_account_ticks = first_tick_array_account.data.borrow_mut();
-        // match start_tick_account {
-        //     TickArray::Initialized {
-        //         ticks: ref mut start_ticks,
-        //         start_tick_index,
-        //         array_index,
-        //     } => (start_ticks, start_tick_index, array_index),
+        {
+            let mut start_bitmap_account_data = start_bitmap_account.data.borrow_mut();
 
-        //     // You MUST handle the case where it is not Initialized
-        //     _ => {
-        //         return Err(AMMError::AccountNotInitialized.into());
-        //     }
-        // };
-        // let last_account_ticks  =
-        // end_tick_account.ticks;
-        msg!("8");
-        //INITIALIZE BITMAP ARRAY ACCOUNTS
-        let start_bitmap_index = start_tick / 10000;
-        let end_bitmap_index = end_tick / 10000;
+            let start_ticks_i64: &[i64] = bytemuck::cast_slice(&start_bitmap_account_data);
+            let start_index = (start_tick % 10000) / 8;
+            #[cfg(debug_assertions)]
+            msg!(
+                "start index: {:?}, {:?}",
+                start_index,
+                start_ticks_i64.len()
+            );
+            if start_ticks_i64[start_index as usize] == 0 {
+                deactivate_bit(&mut start_bitmap_account_data, start_tick as u64);
+            }
+        }
+        {
+            let mut end_bitmap_account_data = end_bitmap_account.data.borrow_mut();
 
-        //updating ticks
-        // for tick in start_account_ticks.iter_mut() {
-        //     if tick.tick_index == start_tick {
-        //         tick.net_liquidity -= withdraw_amount.floor() as i64;
-        //         if tick.net_liquidity == 0 {
-        //             deactivate_bit(&mut start_bitmap_account.data.borrow_mut(), start_tick as u64);
-        //         }
-        //     }
-        // }
-
-        // for tick in last_account_ticks.iter_mut() {
-        //     if tick.tick_index == end_tick {
-        //         tick.net_liquidity += withdraw_amount.floor() as i64;
-        //         if tick.net_liquidity == 0 {
-        //             activate_bit(&mut end_bitmap_account.data.borrow_mut(), end_tick as u64);
-        //         }
-        //     }
-        // }
-        // saving in onchain account
-        // start_tick_account.pack_into_slice(&mut first_tick_array_account.data.borrow_mut());
-        // end_tick_account.pack_into_slice(&mut last_tick_array_account.data.borrow_mut());
+            let end_ticks_i64: &[i64] = bytemuck::cast_slice(&end_bitmap_account_data);
+            let end_index = (end_tick % 10000) / 8;
+            if end_ticks_i64[end_index as usize] == 0 {
+                deactivate_bit(&mut end_bitmap_account_data, end_tick as u64);
+            }
+        }
+        #[cfg(debug_assertions)]
         msg!("9");
         //update the position account and claim the rent exempt if all withdrawn in the signers account
         if minimum_liquidity == 0 {
+            #[cfg(debug_assertions)]
             msg!("9.1");
             {
                 let mut position_data = position_account.data.borrow_mut();
@@ -1114,16 +1229,16 @@ impl Processor {
             let empty_position_instruction = solana_system_interface::instruction::transfer(
                 position_account.key,
                 liquidity_provider_account.key,
-                position_account.lamports()
+                position_account.lamports(),
             );
             let mut position_seeds: Vec<&[u8]> = vec![nft_mint_account.key.as_array()];
             let (_position_account_pda, position_account_bump) = Pubkey::find_program_address(
                 get_lexicographical_tokens_addresses(
                     token_a_mint_account.key,
                     token_b_mint_account.key,
-                    &mut position_seeds
+                    &mut position_seeds,
                 ),
-                amm_program_account.key
+                amm_program_account.key,
             );
 
             solana_program::program::invoke_signed(
@@ -1133,30 +1248,30 @@ impl Processor {
                     position_account.clone(),
                     liquidity_provider_account.clone(),
                 ],
-                &[
-                    &[
-                        nft_mint_account.key.as_array(),
-                        token_a_mint_account.key.as_array(),
-                        token_b_mint_account.key.as_array(),
-                        &[position_account_bump],
-                    ],
-                ]
+                &[&[
+                    nft_mint_account.key.as_array(),
+                    token_a_mint_account.key.as_array(),
+                    token_b_mint_account.key.as_array(),
+                    &[position_account_bump],
+                ]],
             )?;
         } else {
+            #[cfg(debug_assertions)]
             msg!("9.2");
-            let mut position_data = PositionAccount::unpack_from_slice(
-                &position_account.data.borrow()
-            )?;
-            if
-                let PositionAccount::Initialized {
-                    start_tick: _,
-                    end_tick: _,
-                    ref mut liquidity,
-                } = position_data
+            let mut position_data =
+                PositionAccount::unpack_from_slice(&position_account.data.borrow())?;
+            if let PositionAccount::Initialized {
+                start_tick: _,
+                end_tick: _,
+                ref mut liquidity,
+            } = position_data
             {
+                #[cfg(debug_assertions)]
                 msg!("liquidity before: {:?}", q6464_sqrt_to_value(*liquidity));
                 *liquidity = value_to_sqrt_q6464(q6464_sqrt_to_value(*liquidity) - withdraw_amount);
+                #[cfg(debug_assertions)]
                 msg!("liquidity after: {:?}", q6464_sqrt_to_value(*liquidity));
+                #[cfg(debug_assertions)]
                 msg!("withdraw amount : {:?}", withdraw_amount);
             } else {
                 return Err(AMMError::AccountNotInitialized.into());
@@ -1173,8 +1288,9 @@ impl Processor {
         amount_in: u64,
         minimum_amount_out: u64,
         mint_address_in: Pubkey,
-        mint_address_out: Pubkey
+        mint_address_out: Pubkey,
     ) -> ProgramResult {
+        #[cfg(debug_assertions)]
         msg!("swapping!");
         let account_iter = &mut accounts.iter();
 
@@ -1200,20 +1316,20 @@ impl Processor {
         let swapper_token_b_account = next_account_info(account_iter)?;
 
         //7. token_a_mint_account(read only)
-        let token_a_mint_account_temp = next_account_info(account_iter)?;
+        let token_a_mint_account = next_account_info(account_iter)?;
 
         //8. token_b_mint_account(read only)
-        let token_b_mint_account_temp = next_account_info(account_iter)?;
+        let token_b_mint_account = next_account_info(account_iter)?;
 
-        let token_a_mint_account;
-        let token_b_mint_account;
-        if token_a_mint_account_temp.key.to_string() < token_b_mint_account_temp.key.to_string() {
-            token_a_mint_account = token_a_mint_account_temp;
-            token_b_mint_account = token_b_mint_account_temp;
-        } else {
-            token_b_mint_account = token_a_mint_account_temp;
-            token_a_mint_account = token_b_mint_account_temp;
-        }
+        // let token_a_mint_account;
+        // let token_b_mint_account;
+        // if token_a_mint_account_temp.key.to_string() < token_b_mint_account_temp.key.to_string() {
+        //     token_a_mint_account = token_a_mint_account_temp;
+        //     token_b_mint_account = token_b_mint_account_temp;
+        // } else {
+        //     token_b_mint_account = token_a_mint_account_temp;
+        //     token_a_mint_account = token_b_mint_account_temp;
+        // }
 
         //9. amm_program_account (read only)
         let amm_program_account = next_account_info(account_iter)?;
@@ -1232,59 +1348,72 @@ impl Processor {
         // //16. tick_array_account_four (read only)
         // let tick_array_account_four = next_account_info(account_iter)?;
 
-        if mint_address_in != *token_a_mint_account.key {
-            msg!("base mint address doesn't match the provided account");
-            return Err(AMMError::InvalidMintAccount.into());
-        }
-        if mint_address_out != *token_b_mint_account.key {
-            msg!("target mint address doesn't match the provided account");
-            return Err(AMMError::InvalidMintAccount.into());
-        }
+        // if mint_address_in != *token_a_mint_account.key {
+        //     msg!("base mint address doesn't match the provided account");
+        //     return Err(AMMError::InvalidMintAccount.into());
+        // }
+        // if mint_address_out != *token_b_mint_account.key {
+        //     msg!("target mint address doesn't match the provided account");
+        //     return Err(AMMError::InvalidMintAccount.into());
+        // }
         let (amm_token_account_pda, _amm_token_account_bump) = get_lexicographical_token_pda(
             token_a_mint_account.key,
             token_b_mint_account.key,
-            program_id
+            program_id,
         );
         if amm_token_account_pda != *amm_token_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid AMM token account provided.");
             return Err(AMMError::InvalidAMMTokenAccount.into());
         }
+        #[cfg(debug_assertions)]
         msg!("swapping 2!");
         //validating token a pool account
-        let (token_a_pool_account_pda, _token_a_pool_account_bump) = Pubkey::find_program_address(
-            &[b"pool", amm_token_account_pda.as_array(), token_a_mint_account.key.as_array()],
-            program_id
+        let (token_a_pool_account_pda, token_a_pool_account_bump) = Pubkey::find_program_address(
+            &[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_a_mint_account.key.as_array(),
+            ],
+            program_id,
         );
         if token_a_pool_account_pda != *amm_token_a_pool_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid token A pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
         //validating token b pool account
         let (token_b_pool_account_pda, token_b_pool_account_bump) = Pubkey::find_program_address(
-            &[b"pool", amm_token_account_pda.as_array(), token_b_mint_account.key.as_array()],
-            program_id
+            &[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_b_mint_account.key.as_array(),
+            ],
+            program_id,
         );
         if token_b_pool_account_pda != *amm_token_b_pool_account.key {
+            #[cfg(debug_assertions)]
             msg!("Error: Invalid token B pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
         let token_a_pool_data = spl_token_interface::state::Account::unpack_from_slice(
-            &amm_token_a_pool_account.data.borrow()
+            &amm_token_a_pool_account.data.borrow(),
         )?;
 
         let token_b_pool_data = spl_token_interface::state::Account::unpack_from_slice(
-            &amm_token_b_pool_account.data.borrow()
+            &amm_token_b_pool_account.data.borrow(),
         )?;
         if token_b_pool_data.amount < minimum_amount_out {
+            #[cfg(debug_assertions)]
             msg!("Error: token b out amount larger than the pool reserve! ");
             return Err(AMMError::InsufficientTokenBalance.into());
         }
+        #[cfg(debug_assertions)]
         msg!("swapping 3!");
         // PRICE AND RETURNING TOKEN CALCULATION ---------------------------------------------------------------
         //amm token data
-        let mut amm_token_enum = AMMAccount::unpack_from_slice(
-            &amm_token_account.data.borrow_mut()
-        )?;
+        let mut amm_token_enum =
+            AMMAccount::unpack_from_slice(&amm_token_account.data.borrow_mut())?;
         let (
             pool_authority,
             token_a_mint,
@@ -1308,31 +1437,33 @@ impl Processor {
                 active_liquidity,
                 fee_growth,
                 protocol_fee,
-            } => {
-                (
-                    pool_authority,
-                    token_a_mint,
-                    token_b_mint,
-                    token_a_pool,
-                    token_b_pool,
-                    sqrt_price_a_by_b,
-                    current_tick,
-                    active_liquidity,
-                    fee_growth,
-                    protocol_fee,
-                )
-            }
+            } => (
+                pool_authority,
+                token_a_mint,
+                token_b_mint,
+                token_a_pool,
+                token_b_pool,
+                sqrt_price_a_by_b,
+                current_tick,
+                active_liquidity,
+                fee_growth,
+                protocol_fee,
+            ),
             _ => {
+                #[cfg(debug_assertions)]
                 msg!("Error: Amm token account not initialized!");
                 return Err(AMMError::AccountNotInitialized.into());
             }
         };
+        #[cfg(debug_assertions)]
         msg!("swapping 4!");
         //bit array one data
         let bitmap_one_enum = bitmap_account_one.data.borrow();
         let bitmap_one = bitmap_one_enum;
-
+        #[cfg(debug_assertions)]
+        msg!("sqrt_price_a_by_b: {:?}", sqrt_price_a_by_b);
         let current_price = q6464_sqrt_to_value(*sqrt_price_a_by_b);
+        #[cfg(debug_assertions)]
         msg!("current_price:{:?}", current_price);
         let bitarray_index = get_bitarray_index(*current_tick);
 
@@ -1351,25 +1482,30 @@ impl Processor {
         let mut new_current_price = current_price;
         let mut current_liquidity = q6464_sqrt_to_value(*active_liquidity);
         let current_bitmap_index = *current_tick / 10000;
-        msg!("current liquidity: {:?}", current_liquidity);
+        #[cfg(debug_assertions)]
+        msg!(
+            "current liquidity: {:?}, current_price: {:?}",
+            current_liquidity,
+            current_price
+        );
         let mut tick_array_index = new_current_tick / TICK_ARRAY_SIZE;
-        let mut bit_array_account = change_bit_array_account(
-            account_iter,
-            tick_array_index,
-            amm_token_account,
-            amm_program_account
-        )?;
+        let mut bit_array_account: Option<Ref<'_, &mut [u8]>> = None;
 
-        let mut tick_account: &[i64] = bytemuck::cast_slice(&bit_array_account);
+        let mut tick_account: &[i64];
 
         let mut quit = false;
+        #[cfg(debug_assertions)]
         msg!("swapping 5!");
-        let mut active_ticks = get_active_ticks(&bitmap_one);
+        let active_ticks = get_active_ticks(&bitmap_one);
+        // msg!("active_ticks: {:?}", active_ticks);
+        let mut is_liquidity_constant = false;
+        #[cfg(debug_assertions)]
         msg!("active_ticks: {:?}", active_ticks);
-        let mut is_liquidity_constant = true;
         //iterating through bitmap_one
         if mint_address_out == *token_b_mint && mint_address_in == *token_a_mint {
             //validating provided bitmaps
+            #[cfg(debug_assertions)]
+            msg!("swapping 5.1");
             {
                 let (bitmap_one_pda, _) = Pubkey::find_program_address(
                     &[
@@ -1377,7 +1513,7 @@ impl Processor {
                         &current_bitmap_index.to_be_bytes(),
                         &amm_token_account.key.to_bytes(),
                     ],
-                    program_id
+                    program_id,
                 );
                 let (bitmap_two_pda, _) = Pubkey::find_program_address(
                     &[
@@ -1385,198 +1521,157 @@ impl Processor {
                         &(current_bitmap_index + 1).to_be_bytes(),
                         &amm_token_account.key.to_bytes(),
                     ],
-                    program_id
+                    program_id,
                 );
 
-                if
-                    bitmap_one_pda != *bitmap_account_one.key &&
-                    bitmap_two_pda != *bitmap_account_two.key
+                if bitmap_one_pda != *bitmap_account_one.key
+                    && bitmap_two_pda != *bitmap_account_two.key
                 {
                     msg!("invalid bitmap account");
                     return Err(AMMError::InvalidBitmapArray.into());
                 }
             }
-            msg!("swapping 5.1!");
             let current_tick_tail = *current_tick % 10000;
             let expected_tick_with_current_liquidity = price_to_tick_index(
-                price_with_a_and_liquidity(remaining_token_in, current_liquidity)
+                price_with_a_and_liquidity(remaining_token_in, current_liquidity),
             );
-            msg!("current_tick_tail: {:?}", current_tick_tail);
-            for tick_index in active_ticks {
+
+            for tick_index_tail in active_ticks {
                 if !quit {
-                    if tick_index < current_tick_tail {
+                    let tick_index = &(bitarray_index * 10000 + tick_index_tail);
+
+                    if tick_index < current_tick {
                         continue;
                     }
-                    if expected_tick_with_current_liquidity > tick_index {
-                        is_liquidity_constant = false;
-                    }
+                    // let tick_index = bitarray_index * 10000 + tick_index_tail;
+                    // if expected_tick_with_current_liquidity > tick_index {
+                    //     is_liquidity_constant = false;
+                    // }
                     //calculate the tick_index and tick_price for the active tick
 
-                    let mut tick_price = tick_index_to_price(tick_index);
-
                     //calculate the price with remaining tokens with current liquidity
-                    let price_with_remaining_in = price_with_a_and_liquidity(
+                    let price_with_remaining_in = upper_price_from_delta_a(
                         remaining_token_in,
-                        current_liquidity
+                        current_liquidity.floor() as u64,
+                        new_current_price,
                     );
+                    let mut upcoming_tick_price = tick_index_to_price(*tick_index);
+                    #[cfg(debug_assertions)]
                     msg!(
                         "tick index: {:?}, tick Price: {:?}, price with remaining: {:?}",
                         tick_index,
-                        tick_price,
+                        upcoming_tick_price,
                         price_with_remaining_in
                     );
                     //trigger quit if the price_with_remaining_in is less than the tick_price
-                    if tick_price > price_with_remaining_in {
+                    if upcoming_tick_price > price_with_remaining_in {
                         quit = true;
-                        tick_price = price_with_remaining_in;
+                        upcoming_tick_price = price_with_remaining_in;
                     }
 
                     //calculate deltas with tick_prices and current liquidity
+                    #[cfg(debug_assertions)]
+                    msg!("tick price: {:?}", upcoming_tick_price);
                     let delta_a = calculate_delta_a(
                         new_current_price,
-                        tick_price,
-                        current_liquidity
+                        upcoming_tick_price,
+                        current_liquidity,
                     );
                     let delta_b = calculate_delta_b(
                         new_current_price,
-                        tick_price,
-                        current_liquidity
+                        upcoming_tick_price,
+                        current_liquidity,
                     );
+                    #[cfg(debug_assertions)]
                     msg!("delta a: {:?}, delta b: {:?}", delta_a, delta_b);
                     remaining_token_in -= delta_a;
                     total_token_out += delta_b;
 
-                    new_current_tick = tick_index;
-                    new_current_price = tick_price;
+                    new_current_tick = *tick_index;
+                    new_current_price = upcoming_tick_price;
 
-                    loop {
-                        tick_array_index = tick_array_index + 1;
+                    {
+                        tick_array_index = tick_index / 88;
+                        #[cfg(debug_assertions)]
                         msg!("tick_array_index: {:?}", tick_array_index);
                         //dropping to free the mutable reference to the account_iter and its internal data state causing the mutable reference to live.
                         // drop(tick_account);
-                        drop(bit_array_account);
+                        // drop(bit_array_account);
+                        bit_array_account = None;
 
-                        bit_array_account = change_bit_array_account(
+                        bit_array_account = Some(change_bit_array_account(
                             account_iter,
                             tick_array_index,
                             amm_token_account,
-                            amm_program_account
-                        )?;
-                        tick_account = bytemuck::cast_slice(&bit_array_account);
+                            amm_program_account,
+                        )?);
 
-                        if tick_index / TICK_ARRAY_SIZE == tick_array_index {
-                            break;
-                        }
+                        // if tick_index / TICK_ARRAY_SIZE == tick_array_index {
+                        //     break;
+                        // }
                     }
+                    let bit_array_unrap = bit_array_account.unwrap();
+                    tick_account = bytemuck::cast_slice(&bit_array_unrap);
                     let tick_trail = tick_index % TICK_ARRAY_SIZE;
 
                     let net_liquidity = tick_account[tick_trail as usize];
-                    if net_liquidity < 0 {
-                        current_liquidity -= net_liquidity.abs() as f64;
-                    } else {
-                        current_liquidity += net_liquidity.abs() as f64;
-                    }
+                    current_liquidity += net_liquidity as f64;
+                    // if net_liquidity < 0 {
+                    //     current_liquidity -= net_liquidity.abs() as f64;
+                    // } else {
+                    //     current_liquidity += net_liquidity.abs() as f64;
+                    // }
                 }
             }
-            if is_liquidity_constant {
-                let tick_price = price_with_a_and_liquidity(remaining_token_in, current_liquidity);
-                msg!("tick price: {:?}", tick_price);
 
-                //trigger quit if the price_with_remaining_in is less than the tick_price
-
-                //calculate deltas with tick_prices and current liquidity
-                let delta_a = remaining_token_in;
-
-                let delta_b = token_price_with_constant_liquidity(
-                    current_liquidity.floor() as u64,
-                    remaining_token_in
-                );
-                msg!("delta a: {:?}, delta b: {:?}", delta_a, delta_b);
-                remaining_token_in -= delta_a;
-                total_token_out += delta_b;
-
-                new_current_tick = price_to_tick_index(tick_price);
-                new_current_price = tick_price;
-            }
-            // for (id, i) in bitmap_one[index as usize..].iter().enumerate() {
-            //     // msg!("{}", i);
-            //     if !quit {
-            //         for x in 0..8 {
-            //             if check_bit_status_u8(i, x) == 1 && !quit {
-            //                 //calculate the tick_index and tick_price for the active tick
-            //                 let tick_index = index * 10000 + (id as u32) * 8 + (x as u32);
-            //                 let mut tick_price = tick_index_to_price(tick_index);
-
-            //                 //calculate the price with remaining tokens with current liquidity
-            //                 let price_with_remaining_in = price_with_a_and_liquidity(
-            //                     remaining_token_in,
-            //                     current_liquidity
-            //                 );
-
-            //                 //trigger quit if the price_with_remaining_in is less than the tick_price
-            //                 if tick_price > price_with_remaining_in {
-            //                     quit = true;
-            //                     tick_price = price_with_remaining_in;
-            //                 }
-
-            //                 //calculate deltas with tick_prices and current liquidity
-            //                 let delta_a = calculate_delta_a(
-            //                     new_current_price,
-            //                     tick_price,
-            //                     current_liquidity
-            //                 );
-            //                 let delta_b = calculate_delta_b(
-            //                     new_current_price,
-            //                     tick_price,
-            //                     current_liquidity
-            //                 );
-
-            //                 remaining_token_in -= delta_a;
-            //                 total_token_out += delta_b;
-
-            //                 new_current_tick = tick_index;
-            //                 new_current_price = tick_price;
-
-            //                 // if tick_index < new_current_tick / 10000 {
-            //                 //     return Err(AMMError::InvalidTickArray.into());
-            //                 // }
-            //                 loop {
-            //                     if tick_index > tick_index - (tick_index % TICK_ARRAY_SIZE) {
-            //                         tick_array_index = new_current_tick / TICK_ARRAY_SIZE;
-            //                         //dropping to free the mutable reference to the account_iter and its internal data state causing the mutable reference to live.
-            //                         // drop(tick_account);
-            //                         drop(bit_array_account);
-
-            //                         bit_array_account = change_bit_array_account(
-            //                             account_iter,
-            //                             tick_array_index,
-            //                             amm_token_account,
-            //                             amm_program_account
-            //                         )?;
-            //                         tick_account = bytemuck::cast_slice(&bit_array_account);
-            //                         break;
-            //                     }
-            //                 }
-            //                 let array_index_for_tick = tick_index / TICK_ARRAY_SIZE;
-            //                 let tick_trail = tick_index % TICK_ARRAY_SIZE;
-
-            //                 // if array_index_for_tick != tick_account.2 {
-            //                 //     msg!("tick array not found!");
-            //                 //     return Err(AMMError::InvalidTickArray.into());
-            //                 // }
-            //                 let net_liquidity = tick_account[tick_trail as usize];
-            //                 if net_liquidity < 0 {
-            //                     current_liquidity -= net_liquidity.abs() as f64;
-            //                 } else {
-            //                     current_liquidity += net_liquidity.abs() as f64;
-            //                 }
-
-            //                 // update the remaining amount to be calculated
-            //             }
-            //         }
-            //     }
-            // }
+            //moving tokens from swapper to token pool
+            let token_a_admin_to_pool_transfer_instruction =
+                spl_token_interface::instruction::transfer(
+                    spl_token_account.key,
+                    swapper_token_a_account.key,
+                    amm_token_a_pool_account.key,
+                    swapper_account.key,
+                    &[swapper_account.key],
+                    ((amount_in as f64) - remaining_token_in).ceil() as u64,
+                )?;
+            #[cfg(debug_assertions)]
+            msg!("swapper to pool");
+            solana_program::program::invoke(
+                &token_a_admin_to_pool_transfer_instruction,
+                &[
+                    spl_token_account.clone(),
+                    swapper_token_a_account.clone(),
+                    amm_token_a_pool_account.clone(),
+                    swapper_account.clone(),
+                ],
+            )?;
+            let token_b_transfer_instruction = spl_token_interface::instruction::transfer(
+                spl_token_account.key,
+                amm_token_b_pool_account.key,
+                swapper_token_b_account.key,
+                amm_token_b_pool_account.key,
+                &[amm_token_b_pool_account.key],
+                total_token_out.ceil() as u64,
+            )?;
+            #[cfg(debug_assertions)]
+            msg!("pool to swapper");
+            solana_program::program::invoke_signed(
+                &token_b_transfer_instruction,
+                &[
+                    spl_token_account.clone(),
+                    amm_token_b_pool_account.clone(),
+                    swapper_token_b_account.clone(),
+                    amm_token_b_pool_account.clone(),
+                ],
+                &[&[
+                    b"pool",
+                    amm_token_account_pda.as_array(),
+                    token_b_mint_account.key.as_array(),
+                    &[token_b_pool_account_bump],
+                ]],
+            )?;
         } else if mint_address_out == *token_a_mint && mint_address_in == *token_b_mint {
+            #[cfg(debug_assertions)]
             msg!("swapping 5.2!");
             //validating provided bitmaps asdfghjkl;'
             {
@@ -1586,7 +1681,7 @@ impl Processor {
                         &current_bitmap_index.to_be_bytes(),
                         &amm_token_account.key.to_bytes(),
                     ],
-                    program_id
+                    program_id,
                 );
                 let (bitmap_two_pda, _) = Pubkey::find_program_address(
                     &[
@@ -1594,12 +1689,11 @@ impl Processor {
                         &(current_bitmap_index + 1).to_be_bytes(),
                         &amm_token_account.key.to_bytes(),
                     ],
-                    program_id
+                    program_id,
                 );
 
-                if
-                    bitmap_one_pda != *bitmap_account_one.key &&
-                    bitmap_two_pda != *bitmap_account_two.key
+                if bitmap_one_pda != *bitmap_account_one.key
+                    && bitmap_two_pda != *bitmap_account_two.key
                 {
                     msg!("invalid bitmap account");
                     return Err(AMMError::InvalidBitmapArray.into());
@@ -1607,204 +1701,178 @@ impl Processor {
             }
 
             let current_tick_tail = *current_tick / 10000;
+            let expected_tick_with_current_liquidity =
+                price_to_tick_index(lower_price_from_delta_b(
+                    remaining_token_in,
+                    current_liquidity.floor() as u64,
+                    current_price,
+                ));
 
-            for tick_index in active_ticks.iter().rev() {
+            for tick_index_tail in active_ticks.iter().rev() {
                 if !quit {
-                    if *tick_index < current_tick_tail {
+                    let tick_index = &(bitarray_index * 10000 + tick_index_tail);
+                    #[cfg(debug_assertions)]
+                    msg!(
+                        "tick_index: {:?}, current_tick: {:?}, current_price: {:?}",
+                        *tick_index,
+                        *current_tick,
+                        current_price
+                    );
+                    if *tick_index > *current_tick {
                         continue;
                     }
-                    let mut tick_price = tick_index_to_price(*tick_index);
+                    // msg!("tick_index_tail: {:?}, current_tick_tail: {:?}, expected_tick_with_current_liquidity: {:?}", tick_index, current_tick_tail,expected_tick_with_current_liquidity);
 
-                    //calculate the price with remaining tokens with current liquidity
-                    let price_with_remaining_in = price_with_b_and_liquidity(
+                    // if expected_tick_with_current_liquidity > *tick_index {
+                    //     is_liquidity_constant = true;
+                    //     break;
+                    // }
+                    let remaining_in_price = lower_price_from_delta_b(
                         remaining_token_in,
+                        current_liquidity.floor() as u64,
+                        new_current_price,
+                    );
+                    //calculate the tick_index and tick_price for the active tick
+                    let mut upcoming_tick_price = tick_index_to_price(*tick_index);
+
+                    #[cfg(debug_assertions)]
+                    msg!(
+                        "tick_price: {}, remaining_in_price: {}, current_liquidity: {}",
+                        upcoming_tick_price,
+                        remaining_in_price,
                         current_liquidity
                     );
+                    //calculate the price with remaining tokens with current liquidity
+                    // let price_with_remaining_in =
+                    //     price_with_b_and_liquidity(remaining_token_in, current_liquidity);
+
                     //trigger quit if the price_with_remaining_in is less than the tick_price
-                    if tick_price < price_with_remaining_in {
+                    if upcoming_tick_price < remaining_in_price {
                         quit = true;
-                        tick_price = price_with_remaining_in;
+                        upcoming_tick_price = remaining_in_price;
                     }
                     //calculate deltas with tick_prices and current liquidity
                     let delta_a = calculate_delta_a(
-                        tick_price,
+                        upcoming_tick_price,
                         new_current_price,
-                        current_liquidity
+                        current_liquidity,
                     );
                     let delta_b = calculate_delta_b(
-                        tick_price,
+                        upcoming_tick_price,
                         new_current_price,
-                        current_liquidity
+                        current_liquidity,
                     );
 
                     remaining_token_in -= delta_b;
                     total_token_out += delta_a;
+                    #[cfg(debug_assertions)]
+                    msg!(
+                        "delta_a: {}, delta_b: {}, remaining_token_in: {}, total_token_out: {}",
+                        delta_a,
+                        delta_b,
+                        remaining_token_in,
+                        total_token_out
+                    );
 
                     new_current_tick = *tick_index;
-                    new_current_price = tick_price;
+                    new_current_price = upcoming_tick_price;
 
-                    loop {
-                        tick_array_index = tick_array_index - 1;
+                    {
+                        tick_array_index = tick_index / TICK_ARRAY_SIZE;
+                        // msg!("tick_array_index: {:?}", tick_array_index);
                         //dropping to free the mutable reference to the account_iter and its internal data state causing the mutable reference to live.
                         // drop(tick_account);
-                        drop(bit_array_account);
+                        // if bit_array_account.is_some() {
+                        bit_array_account = None;
+                        // };
 
-                        bit_array_account = change_bit_array_account(
+                        bit_array_account = Some(change_bit_array_account(
                             account_iter,
                             tick_array_index,
                             amm_token_account,
-                            amm_program_account
-                        )?;
-                        tick_account = bytemuck::cast_slice(&bit_array_account);
-
-                        if tick_index / TICK_ARRAY_SIZE == tick_array_index {
-                            break;
-                        }
+                            amm_program_account,
+                        )?);
+                        #[cfg(debug_assertions)]
+                        msg!(
+                            "breaking: tick_array_index: {:?}, tick_index: {:?}",
+                            tick_array_index,
+                            tick_index / TICK_ARRAY_SIZE
+                        );
                     }
+                    let bit_array_unrap = bit_array_account.unwrap();
+                    tick_account = bytemuck::cast_slice(&bit_array_unrap);
                     let tick_trail = tick_index % TICK_ARRAY_SIZE;
 
-                    // if array_index_for_tick != tick_account.2 {
-                    //     msg!("tick array not found!");
-                    //     return Err(AMMError::InvalidTickArray.into());
-                    // }
                     let net_liquidity = tick_account[tick_trail as usize];
-                    if net_liquidity < 0 {
-                        current_liquidity -= net_liquidity.abs() as f64;
-                    } else {
-                        current_liquidity += net_liquidity.abs() as f64;
-                    }
+                    current_liquidity -= net_liquidity as f64;
+                    // if net_liquidity < 0 {
+                    //     current_liquidity -= net_liquidity.abs() as f64;
+                    // } else {
+                    //     current_liquidity += net_liquidity.abs() as f64;
+                    // }
                 }
             }
-            // for (id, i) in bitmap_one[..index as usize].iter().rev().enumerate() {
-            //     for x in (0..8).rev() {
-            //         if check_bit_status_u8(i, x) == 1 && !quit {
-            //             //calculate the tick_index and tick_price for the active tick
-            //             let tick_index = index * 10000 + (id as u32) * 8 + (x as u32);
-            //             let mut tick_price = tick_index_to_price(tick_index);
 
-            //             //calculate the price with remaining tokens with current liquidity
-            //             let price_with_remaining_in = price_with_b_and_liquidity(
-            //                 remaining_token_in,
-            //                 current_liquidity
-            //             );
-
-            //             //trigger quit if the price_with_remaining_in is less than the tick_price
-            //             if tick_price > price_with_remaining_in {
-            //                 quit = true;
-            //                 tick_price = price_with_remaining_in;
-            //             }
-
-            //             //calculate deltas with tick_prices and current liquidity
-            //             let delta_a = calculate_delta_a(
-            //                 tick_price,
-            //                 new_current_price,
-            //                 current_liquidity
-            //             );
-            //             let delta_b = calculate_delta_b(
-            //                 tick_price,
-            //                 new_current_price,
-            //                 current_liquidity
-            //             );
-
-            //             remaining_token_in -= delta_b;
-            //             total_token_out += delta_a;
-
-            //             new_current_tick = tick_index;
-            //             new_current_price = tick_price;
-
-            //             // if tick_index > tick_account.1 + 88 {
-            //             //     return Err(AMMError::InvalidTickArray.into());
-            //             // }
-            //             loop {
-            //                 if tick_index < tick_index - (tick_index % TICK_ARRAY_SIZE) {
-            //                     // drop(tick_account);
-            //                     drop(bit_array_account);
-
-            //                     bit_array_account = change_bit_array_account(
-            //                         account_iter,
-            //                         tick_array_index,
-            //                         amm_token_account,
-            //                         amm_program_account
-            //                     )?;
-
-            //                     tick_account = bytemuck::cast_slice(&bit_array_account);
-            //                     break;
-            //                 }
-            //             }
-            //             let array_index_for_tick = tick_index / TICK_ARRAY_SIZE;
-            //             let tick_trail = tick_index % TICK_ARRAY_SIZE;
-
-            //             // if array_index_for_tick != tick_account.2 {
-            //             //     msg!("tick array not found!");
-            //             //     return Err(AMMError::InvalidTickArray.into());
-            //             // }
-            //             let net_liquidity = tick_account[tick_trail as usize];
-            //             if net_liquidity < 0 {
-            //                 current_liquidity -= net_liquidity.abs() as f64;
-            //             } else {
-            //                 current_liquidity += net_liquidity.abs() as f64;
-            //             }
-            //             // update the remaining amount to be calculated
-            //         }
-            //     }
-            // }
+            //moving tokens from swapper to token pool
+            let token_b_provider_to_pool_transfer_instruction =
+                spl_token_interface::instruction::transfer(
+                    spl_token_account.key,
+                    swapper_token_b_account.key,
+                    amm_token_b_pool_account.key,
+                    swapper_account.key,
+                    &[swapper_account.key],
+                    ((amount_in as f64) - remaining_token_in).ceil() as u64,
+                )?;
+            #[cfg(debug_assertions)]
+            msg!("swapper to pool");
+            solana_program::program::invoke(
+                &token_b_provider_to_pool_transfer_instruction,
+                &[
+                    spl_token_account.clone(),
+                    swapper_token_b_account.clone(),
+                    amm_token_b_pool_account.clone(),
+                    swapper_account.clone(),
+                ],
+            )?;
+            let token_a_pool_to_provider_transfer_instruction =
+                spl_token_interface::instruction::transfer(
+                    spl_token_account.key,
+                    amm_token_a_pool_account.key,
+                    swapper_token_a_account.key,
+                    amm_token_a_pool_account.key,
+                    &[amm_token_a_pool_account.key],
+                    total_token_out.ceil() as u64,
+                )?;
+            #[cfg(debug_assertions)]
+            msg!("pool to swapper");
+            solana_program::program::invoke_signed(
+                &token_a_pool_to_provider_transfer_instruction,
+                &[
+                    spl_token_account.clone(),
+                    amm_token_a_pool_account.clone(),
+                    swapper_token_a_account.clone(),
+                    amm_token_a_pool_account.clone(),
+                ],
+                &[&[
+                    b"pool",
+                    amm_token_account_pda.as_array(),
+                    token_a_mint_account.key.as_array(),
+                    &[token_a_pool_account_bump],
+                ]],
+            )?;
         }
-
+        *current_tick = new_current_tick;
         *active_liquidity = value_to_sqrt_q6464(current_liquidity);
         *sqrt_price_a_by_b = value_to_sqrt_q6464(new_current_price);
 
         amm_token_enum.pack_into_slice(&mut amm_token_account.data.borrow_mut());
+        #[cfg(debug_assertions)]
         msg!(
             "amount in : {:?} - {:?}, amount out: {:?}",
             amount_in,
             remaining_token_in,
             total_token_out
         );
-        //moving tokens from swapper to token pool
-        let token_a_admin_to_pool_transfer_instruction = spl_token_interface::instruction::transfer(
-            spl_token_account.key,
-            swapper_token_a_account.key,
-            amm_token_a_pool_account.key,
-            swapper_account.key,
-            &[swapper_account.key],
-            ((amount_in as f64) - remaining_token_in).ceil() as u64
-        )?;
-        msg!("swapper to pool");
-        solana_program::program::invoke(
-            &token_a_admin_to_pool_transfer_instruction,
-            &[
-                spl_token_account.clone(),
-                swapper_token_a_account.clone(),
-                amm_token_a_pool_account.clone(),
-                swapper_account.clone(),
-            ]
-        )?;
-        let token_b_transfer_instruction = spl_token_interface::instruction::transfer(
-            spl_token_account.key,
-            amm_token_b_pool_account.key,
-            swapper_token_b_account.key,
-            amm_token_b_pool_account.key,
-            &[amm_token_b_pool_account.key],
-            total_token_out.ceil() as u64
-        )?;
-        msg!("pool to swapper");
-        solana_program::program::invoke_signed(
-            &token_b_transfer_instruction,
-            &[
-                spl_token_account.clone(),
-                amm_token_b_pool_account.clone(),
-                swapper_token_b_account.clone(),
-                amm_token_b_pool_account.clone(),
-            ],
-            &[
-                &[
-                    b"pool",
-                    amm_token_account_pda.as_array(),
-                    token_b_mint_account.key.as_array(),
-                    &[token_b_pool_account_bump],
-                ],
-            ]
-        )?;
         Ok(())
     }
 }
@@ -1819,7 +1887,7 @@ pub fn initialize_amm_pool_account<'a>(
     token_a_mint_account: &Pubkey,
     token_b_mint_account: &Pubkey,
     token_a_pool_account: &Pubkey,
-    token_b_pool_account: &Pubkey
+    token_b_pool_account: &Pubkey,
 ) -> ProgramResult {
     //creating amm pool account if not already created
     let bump_slice = [amm_token_account_bump];
@@ -1831,19 +1899,21 @@ pub fn initialize_amm_pool_account<'a>(
                 amm_token_account.key,
                 Rent::get()?.minimum_balance(AMMAccount::LEN),
                 AMMAccount::LEN as u64,
-                program_id
+                program_id,
             );
         solana_program::program::invoke_signed(
             &lp_token_mint_account_create_instruction,
-            &[system_program_account.clone(), admin_account.clone(), amm_token_account.clone()],
             &[
-                get_lexicographical_tokens_addresses_with_bump(
-                    token_a_mint_account,
-                    token_b_mint_account,
-                    &mut seeds,
-                    &bump_slice
-                ),
-            ]
+                system_program_account.clone(),
+                admin_account.clone(),
+                amm_token_account.clone(),
+            ],
+            &[get_lexicographical_tokens_addresses_with_bump(
+                token_a_mint_account,
+                token_b_mint_account,
+                &mut seeds,
+                &bump_slice,
+            )],
         )?;
     }
 
@@ -1876,7 +1946,7 @@ pub fn initialize_lp_token_mint_account<'a>(
     lp_token_mint_account_bump: u8,
     token_a_mint_account: &AccountInfo<'a>,
     token_b_mint_account: &AccountInfo<'a>,
-    sysvar_rent_account: &AccountInfo<'a>
+    sysvar_rent_account: &AccountInfo<'a>,
 ) -> ProgramResult {
     if lp_token_mint_account.data.borrow().len() == 0 {
         let lp_token_mint_account_create_instruction =
@@ -1885,21 +1955,23 @@ pub fn initialize_lp_token_mint_account<'a>(
                 lp_token_mint_account.key,
                 Rent::get()?.minimum_balance(spl_token_interface::state::Mint::LEN),
                 spl_token_interface::state::Mint::LEN as u64,
-                spl_token_program_account.key
+                spl_token_program_account.key,
             );
 
         solana_program::program::invoke_signed(
             &lp_token_mint_account_create_instruction,
-            &[system_program_account.clone(), admin_account.clone(), lp_token_mint_account.clone()],
             &[
-                &[
-                    b"mint",
-                    amm_token_account_pda.as_array(),
-                    token_a_mint_account.key.as_array(),
-                    token_b_mint_account.key.as_array(),
-                    &[lp_token_mint_account_bump],
-                ],
-            ]
+                system_program_account.clone(),
+                admin_account.clone(),
+                lp_token_mint_account.clone(),
+            ],
+            &[&[
+                b"mint",
+                amm_token_account_pda.as_array(),
+                token_a_mint_account.key.as_array(),
+                token_b_mint_account.key.as_array(),
+                &[lp_token_mint_account_bump],
+            ]],
         )?;
     }
 
@@ -1908,7 +1980,7 @@ pub fn initialize_lp_token_mint_account<'a>(
         lp_token_mint_account.key,
         lp_token_mint_account.key,
         Some(lp_token_mint_account.key),
-        0
+        0,
     )?;
 
     let _ = solana_program::program::invoke_signed(
@@ -1918,15 +1990,13 @@ pub fn initialize_lp_token_mint_account<'a>(
             lp_token_mint_account.clone(),
             sysvar_rent_account.clone(),
         ],
-        &[
-            &[
-                b"mint",
-                amm_token_account_pda.as_array(),
-                token_a_mint_account.key.as_array(),
-                token_b_mint_account.key.as_array(),
-                &[lp_token_mint_account_bump],
-            ],
-        ]
+        &[&[
+            b"mint",
+            amm_token_account_pda.as_array(),
+            token_a_mint_account.key.as_array(),
+            token_b_mint_account.key.as_array(),
+            &[lp_token_mint_account_bump],
+        ]],
     )?;
     Ok(())
 }
@@ -1945,7 +2015,7 @@ pub fn initialize_token_pool_accounts<'a>(
     token_b_pool_account_bump: u8,
     _amm_token_account: &AccountInfo<'a>,
     sysvar_rent_account: &AccountInfo<'a>,
-    amm_program_account: &AccountInfo<'a>
+    amm_program_account: &AccountInfo<'a>,
 ) -> ProgramResult {
     if token_a_pool_account.data.borrow().len() == 0 {
         let token_a_pool_account_create_instruction =
@@ -1954,20 +2024,22 @@ pub fn initialize_token_pool_accounts<'a>(
                 token_a_pool_account.key,
                 Rent::get()?.minimum_balance(spl_token_interface::state::Account::LEN),
                 spl_token_interface::state::Account::LEN as u64,
-                spl_token_program_account.key
+                spl_token_program_account.key,
             );
 
         solana_program::program::invoke_signed(
             &token_a_pool_account_create_instruction,
-            &[system_program_account.clone(), admin_account.clone(), token_a_pool_account.clone()],
             &[
-                &[
-                    b"pool",
-                    amm_token_account_pda.as_array(),
-                    token_a_mint_account.key.as_array(),
-                    &[token_a_pool_account_bump],
-                ],
-            ]
+                system_program_account.clone(),
+                admin_account.clone(),
+                token_a_pool_account.clone(),
+            ],
+            &[&[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_a_mint_account.key.as_array(),
+                &[token_a_pool_account_bump],
+            ]],
         )?;
     }
     if token_b_pool_account.data.borrow().len() == 0 {
@@ -1977,20 +2049,22 @@ pub fn initialize_token_pool_accounts<'a>(
                 token_b_pool_account.key,
                 Rent::get()?.minimum_balance(spl_token_interface::state::Account::LEN),
                 spl_token_interface::state::Account::LEN as u64,
-                spl_token_program_account.key
+                spl_token_program_account.key,
             );
 
         solana_program::program::invoke_signed(
             &token_b_pool_account_create_instruction,
-            &[system_program_account.clone(), admin_account.clone(), token_b_pool_account.clone()],
             &[
-                &[
-                    b"pool",
-                    amm_token_account_pda.as_array(),
-                    token_b_mint_account.key.as_array(),
-                    &[token_b_pool_account_bump],
-                ],
-            ]
+                system_program_account.clone(),
+                admin_account.clone(),
+                token_b_pool_account.clone(),
+            ],
+            &[&[
+                b"pool",
+                amm_token_account_pda.as_array(),
+                token_b_mint_account.key.as_array(),
+                &[token_b_pool_account_bump],
+            ]],
         )?;
     }
 
@@ -1999,7 +2073,7 @@ pub fn initialize_token_pool_accounts<'a>(
             spl_token_program_account.key,
             token_a_pool_account.key,
             token_a_mint_account.key,
-            token_a_pool_account.key
+            token_a_pool_account.key,
         )?;
 
     let _ = solana_program::program::invoke_signed(
@@ -2011,14 +2085,12 @@ pub fn initialize_token_pool_accounts<'a>(
             amm_program_account.clone(),
             sysvar_rent_account.clone(),
         ],
-        &[
-            &[
-                b"pool",
-                amm_token_account_pda.as_array(),
-                token_a_mint_account.key.as_array(),
-                &[token_a_pool_account_bump],
-            ],
-        ]
+        &[&[
+            b"pool",
+            amm_token_account_pda.as_array(),
+            token_a_mint_account.key.as_array(),
+            &[token_a_pool_account_bump],
+        ]],
     );
 
     let token_b_pool_account_initialize_instruction =
@@ -2026,7 +2098,7 @@ pub fn initialize_token_pool_accounts<'a>(
             spl_token_program_account.key,
             token_b_pool_account.key,
             token_b_mint_account.key,
-            token_b_pool_account.key
+            token_b_pool_account.key,
         )?;
 
     let _ = solana_program::program::invoke_signed(
@@ -2038,14 +2110,12 @@ pub fn initialize_token_pool_accounts<'a>(
             amm_program_account.clone(),
             sysvar_rent_account.clone(),
         ],
-        &[
-            &[
-                b"pool",
-                amm_token_account_pda.as_array(),
-                token_b_mint_account.key.as_array(),
-                &[token_b_pool_account_bump],
-            ],
-        ]
+        &[&[
+            b"pool",
+            amm_token_account_pda.as_array(),
+            token_b_mint_account.key.as_array(),
+            &[token_b_pool_account_bump],
+        ]],
     );
     Ok(())
 }
@@ -2062,7 +2132,7 @@ pub fn initialize_admin_lp_token_account<'a>(
     token_b_mint_account: &AccountInfo<'a>,
     admin_lp_token_account_bump: u8,
     sysvar_rent_account: &AccountInfo<'a>,
-    amm_program_account: &AccountInfo<'a>
+    amm_program_account: &AccountInfo<'a>,
 ) -> ProgramResult {
     if admin_lp_token_account.data.borrow().len() == 0 {
         let admin_lp_token_account_create_instruction =
@@ -2071,7 +2141,7 @@ pub fn initialize_admin_lp_token_account<'a>(
                 admin_lp_token_account.key,
                 Rent::get()?.minimum_balance(spl_token_interface::state::Account::LEN),
                 spl_token_interface::state::Account::LEN as u64,
-                spl_token_program_account.key
+                spl_token_program_account.key,
             );
 
         solana_program::program::invoke_signed(
@@ -2081,19 +2151,17 @@ pub fn initialize_admin_lp_token_account<'a>(
                 admin_account.clone(),
                 admin_lp_token_account.clone(),
             ],
-            &[
-                &[
-                    admin_account.key.as_array(),
-                    amm_token_account_pda.as_array(),
-                    token_a_mint_account.key.as_array(),
-                    token_b_mint_account.key.as_array(),
-                    &[admin_lp_token_account_bump],
-                ],
-            ]
+            &[&[
+                admin_account.key.as_array(),
+                amm_token_account_pda.as_array(),
+                token_a_mint_account.key.as_array(),
+                token_b_mint_account.key.as_array(),
+                &[admin_lp_token_account_bump],
+            ]],
         )?;
     }
     let spl_state = spl_token_interface::state::Account::unpack_from_slice(
-        &admin_lp_token_account.data.borrow()
+        &admin_lp_token_account.data.borrow(),
     )?;
     if !spl_state.is_initialized() {
         let admin_lp_token_account_initialize_instruction =
@@ -2101,7 +2169,7 @@ pub fn initialize_admin_lp_token_account<'a>(
                 spl_token_program_account.key,
                 admin_lp_token_account.key,
                 lp_token_mint_account.key,
-                admin_account.key
+                admin_account.key,
             )?;
 
         solana_program::program::invoke_signed(
@@ -2113,15 +2181,13 @@ pub fn initialize_admin_lp_token_account<'a>(
                 amm_program_account.clone(),
                 sysvar_rent_account.clone(),
             ],
-            &[
-                &[
-                    admin_account.key.as_array(),
-                    amm_token_account_pda.as_array(),
-                    token_a_mint_account.key.as_array(),
-                    token_b_mint_account.key.as_array(),
-                    &[admin_lp_token_account_bump],
-                ],
-            ]
+            &[&[
+                admin_account.key.as_array(),
+                amm_token_account_pda.as_array(),
+                token_a_mint_account.key.as_array(),
+                token_b_mint_account.key.as_array(),
+                &[admin_lp_token_account_bump],
+            ]],
         )?;
     }
     Ok(())
@@ -2140,17 +2206,27 @@ pub fn get_lexicographical_mint_pda(
     amm_token_account: &Pubkey,
     a: &Pubkey,
     b: &Pubkey,
-    program_id: &Pubkey
+    program_id: &Pubkey,
 ) -> (Pubkey, u8) {
     if *a.to_string() > *b.to_string() {
         Pubkey::find_program_address(
-            &[str, amm_token_account.as_array(), b.as_array(), a.as_array()],
-            program_id
+            &[
+                str,
+                amm_token_account.as_array(),
+                b.as_array(),
+                a.as_array(),
+            ],
+            program_id,
         )
     } else {
         Pubkey::find_program_address(
-            &[str, amm_token_account.as_array(), a.as_array(), b.as_array()],
-            program_id
+            &[
+                str,
+                amm_token_account.as_array(),
+                a.as_array(),
+                b.as_array(),
+            ],
+            program_id,
         )
     }
 }
@@ -2160,17 +2236,27 @@ pub fn get_lexicographical_lp_token_pda(
     amm_token_account: &Pubkey,
     a: &Pubkey,
     b: &Pubkey,
-    program_id: &Pubkey
+    program_id: &Pubkey,
 ) -> (Pubkey, u8) {
     if *a.to_string() > *b.to_string() {
         Pubkey::find_program_address(
-            &[owner_address.as_array(), amm_token_account.as_array(), b.as_array(), a.as_array()],
-            program_id
+            &[
+                owner_address.as_array(),
+                amm_token_account.as_array(),
+                b.as_array(),
+                a.as_array(),
+            ],
+            program_id,
         )
     } else {
         Pubkey::find_program_address(
-            &[owner_address.as_array(), amm_token_account.as_array(), a.as_array(), b.as_array()],
-            program_id
+            &[
+                owner_address.as_array(),
+                amm_token_account.as_array(),
+                a.as_array(),
+                b.as_array(),
+            ],
+            program_id,
         )
     }
 }
@@ -2178,7 +2264,7 @@ pub fn get_lexicographical_lp_token_pda(
 pub fn get_lexicographical_tokens_addresses<'a>(
     x: &'a Pubkey,
     y: &'a Pubkey,
-    seeds: &'a mut Vec<&'a [u8]>
+    seeds: &'a mut Vec<&'a [u8]>,
 ) -> &'a mut Vec<&'a [u8]> {
     if *x.to_string() > *y.to_string() {
         seeds.push(y.as_array());
@@ -2193,7 +2279,7 @@ pub fn get_lexicographical_tokens_addresses_with_bump<'a>(
     x: &'a Pubkey,
     y: &'a Pubkey,
     seeds: &'a mut Vec<&'a [u8]>,
-    bump: &'a [u8]
+    bump: &'a [u8],
 ) -> &'a mut Vec<&'a [u8]> {
     if *x.to_string() > *y.to_string() {
         seeds.push(y.as_array());
@@ -2241,7 +2327,7 @@ pub fn initialize_nft_accounts<'a>(
     nft_mint_account: &AccountInfo<'a>,
     admin_account: &AccountInfo<'a>,
     system_program_account: &AccountInfo<'a>,
-    metaplex_core_program_account: &AccountInfo<'a>
+    metaplex_core_program_account: &AccountInfo<'a>,
 ) -> ProgramResult {
     // if nft_mint_account.data_is_empty(){
     //     let nft_mint_account_create_instruction =
@@ -2259,12 +2345,12 @@ pub fn initialize_nft_accounts<'a>(
     //     )?;
     //     msg!("created account");
     // }
+    #[cfg(debug_assertions)]
     msg!("mpl core program id: {:?}", nft_mint_account.data);
 
     let accounts: Vec<AccountMeta> = vec![
         //      /// The address of the new asset
         // pub asset: solana_program::pubkey::Pubkey,
-
         AccountMeta {
             pubkey: *nft_mint_account.key,
             is_signer: true,
@@ -2272,27 +2358,24 @@ pub fn initialize_nft_accounts<'a>(
         },
         // /// The collection to which the asset belongs (optional)
         // pub collection: solana_program::pubkey::Pubkey,
-
         AccountMeta {
             pubkey: solana_address::Address::from_str_const(
-                "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+                "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d",
             ),
             is_signer: false,
             is_writable: false,
         },
         // /// The authority signing for creation (optional)
         // pub authority: solana_program::pubkey::Pubkey,
-
         AccountMeta {
             pubkey: solana_address::Address::from_str_const(
-                "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+                "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d",
             ),
             is_signer: false,
             is_writable: false,
         },
         // /// The account paying for the storage fees
         // pub payer: solana_program::pubkey::Pubkey,
-
         AccountMeta {
             pubkey: *admin_account.key,
             is_signer: true,
@@ -2300,27 +2383,24 @@ pub fn initialize_nft_accounts<'a>(
         },
         // /// The owner of the new asset. Defaults to the authority if not present. (optional)
         // pub owner: solana_program::pubkey::Pubkey,
-
         AccountMeta {
             pubkey: solana_address::Address::from_str_const(
-                "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+                "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d",
             ),
             is_signer: false,
             is_writable: false,
         },
         // /// The authority on the new asset (optional)
         // pub update_authority: solana_program::pubkey::Pubkey,
-
         AccountMeta {
             pubkey: solana_address::Address::from_str_const(
-                "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+                "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d",
             ),
             is_signer: false,
             is_writable: false,
         },
         // /// The system program
         // pub system_program: solana_program::pubkey::Pubkey,
-
         AccountMeta {
             pubkey: *system_program_account.key,
             is_signer: false,
@@ -2328,14 +2408,13 @@ pub fn initialize_nft_accounts<'a>(
         },
         // /// The SPL Noop Program (optional)
         // pub log_wrapper: solana_program::pubkey::Pubkey,
-
         AccountMeta {
             pubkey: solana_address::Address::from_str_const(
-                "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+                "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d",
             ),
             is_signer: false,
             is_writable: false,
-        }
+        },
     ];
 
     let data = CreateV1InstructionArgs {
@@ -2345,12 +2424,14 @@ pub fn initialize_nft_accounts<'a>(
         plugins: None,
     };
     let mut serialized_data = vec![0];
-    data.serialize(&mut serialized_data).expect("cannot serialize metaplex data!");
+    data.serialize(&mut serialized_data)
+        .expect("cannot serialize metaplex data!");
+    #[cfg(debug_assertions)]
     msg!("{:?}", serialized_data);
 
     let instruction = solana_program::instruction::Instruction {
         program_id: solana_address::Address::from_str_const(
-            "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+            "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d",
         ),
         accounts: accounts,
         data: serialized_data,
@@ -2367,7 +2448,7 @@ pub fn initialize_nft_accounts<'a>(
             metaplex_core_program_account.clone(),
             system_program_account.clone(),
             metaplex_core_program_account.clone(),
-        ]
+        ],
     )?;
     Ok(())
 }
@@ -2383,7 +2464,7 @@ pub fn initialize_position_account<'a>(
     position_account_bump: u8,
     start_tick: u32,
     end_tick: u32,
-    liquidity: u128
+    liquidity: u128,
 ) -> ProgramResult {
     if position_account.data.borrow().len() == 0 {
         let admin_lp_token_account_create_instruction =
@@ -2392,27 +2473,33 @@ pub fn initialize_position_account<'a>(
                 position_account.key,
                 Rent::get()?.minimum_balance(PositionAccount::LEN),
                 PositionAccount::LEN as u64,
-                amm_program_account.key
+                amm_program_account.key,
             );
 
-        msg!("position account data: {:?}", position_account.data.borrow().len());
+        #[cfg(debug_assertions)]
+        msg!(
+            "position account data: {:?}",
+            position_account.data.borrow().len()
+        );
         let mut seeds: Vec<&[u8]> = vec![nft_mint_account.key.as_array()];
         solana_program::program::invoke_signed(
             &admin_lp_token_account_create_instruction,
-            &[system_program_account.clone(), admin_account.clone(), position_account.clone()],
             &[
-                get_lexicographical_tokens_addresses_with_bump(
-                    token_a_mint_account.key,
-                    token_b_mint_account.key,
-                    &mut seeds,
-                    &[position_account_bump]
-                ),
-            ]
+                system_program_account.clone(),
+                admin_account.clone(),
+                position_account.clone(),
+            ],
+            &[get_lexicographical_tokens_addresses_with_bump(
+                token_a_mint_account.key,
+                token_b_mint_account.key,
+                &mut seeds,
+                &[position_account_bump],
+            )],
         )?;
     }
-    let position_account_data = PositionAccount::unpack_from_slice(
-        position_account.data.borrow().as_ref()
-    )?;
+    let position_account_data =
+        PositionAccount::unpack_from_slice(position_account.data.borrow().as_ref())?;
+    #[cfg(debug_assertions)]
     msg!("deserialized!");
     match position_account_data {
         PositionAccount::Uninitialized => {
@@ -2421,11 +2508,11 @@ pub fn initialize_position_account<'a>(
                 end_tick,
                 liquidity,
             };
-            position_account_initialize_data.pack_into_slice(
-                &mut position_account.data.borrow_mut()
-            );
+            position_account_initialize_data
+                .pack_into_slice(&mut position_account.data.borrow_mut());
         }
         PositionAccount::Initialized { .. } => {
+            #[cfg(debug_assertions)]
             msg!("Position account already initialized");
             return Err(AMMError::AccountAlreadyInitialized.into());
         }
@@ -2442,28 +2529,43 @@ pub fn initialize_tick_array_accounts<'a>(
     amm_token_account: &AccountInfo<'a>,
     start_tick: u32,
     last_tick: u32,
-    active_liquidity: f64
+    active_liquidity_squared: f64,
 ) -> ProgramResult {
+    let active_liquidity = active_liquidity_squared.sqrt();
     let start_tick_array_index = start_tick / (TICK_ARRAY_SIZE as u32);
     let last_tick_array_index = last_tick / (TICK_ARRAY_SIZE as u32);
 
     let (first_tick_array_pda, first_tick_array_bump) = Pubkey::find_program_address(
-        &[&start_tick_array_index.to_be_bytes(), amm_token_account.key.as_array()],
-        amm_program_account.key
+        &[
+            &start_tick_array_index.to_be_bytes(),
+            amm_token_account.key.as_array(),
+        ],
+        amm_program_account.key,
     );
     let (last_tick_array_pda, last_tick_array_bump) = Pubkey::find_program_address(
-        &[&last_tick_array_index.to_be_bytes(), amm_token_account.key.as_array()],
-        amm_program_account.key
+        &[
+            &last_tick_array_index.to_be_bytes(),
+            amm_token_account.key.as_array(),
+        ],
+        amm_program_account.key,
     );
 
-    msg!("{}, {}, {}", last_tick_array_index, last_tick_array_pda, last_tick_array_account.key);
+    #[cfg(debug_assertions)]
+    msg!(
+        "{}, {}, {}",
+        last_tick_array_index,
+        last_tick_array_pda,
+        last_tick_array_account.key
+    );
     //validating first tick array account
     if first_tick_array_pda != *first_tick_array_account.key {
+        #[cfg(debug_assertions)]
         msg!("Error: Invalid first tick array account provided.");
         return Err(AMMError::InvalidPDA.into());
     }
     //validating last tick array account
     if last_tick_array_pda != *last_tick_array_account.key {
+        #[cfg(debug_assertions)]
         msg!("Error: Invalid last tick array account provided.");
         return Err(AMMError::InvalidPDA.into());
     }
@@ -2476,7 +2578,7 @@ pub fn initialize_tick_array_accounts<'a>(
                 first_tick_array_account.key,
                 Rent::get()?.minimum_balance(TickArray::LEN),
                 TickArray::LEN as u64,
-                amm_program_account.key
+                amm_program_account.key,
             );
         solana_program::program::invoke_signed(
             &first_tick_array_account_create_instruction,
@@ -2485,19 +2587,16 @@ pub fn initialize_tick_array_accounts<'a>(
                 admin_account.clone(),
                 first_tick_array_account.clone(),
             ],
-            &[
-                &[
-                    &start_tick_array_index.to_be_bytes(),
-                    amm_token_account.key.as_array(),
-                    &[first_tick_array_bump],
-                ],
-            ]
+            &[&[
+                &start_tick_array_index.to_be_bytes(),
+                amm_token_account.key.as_array(),
+                &[first_tick_array_bump],
+            ]],
         )?;
     }
     //initialize last tick array account
-    if
-        last_tick_array_account.data.borrow().len() == 0 &&
-        start_tick_array_index != last_tick_array_index
+    if last_tick_array_account.data.borrow().len() == 0
+        && start_tick_array_index != last_tick_array_index
     {
         let last_tick_array_account_account_create_instruction =
             solana_system_interface::instruction::create_account(
@@ -2505,7 +2604,7 @@ pub fn initialize_tick_array_accounts<'a>(
                 last_tick_array_account.key,
                 Rent::get()?.minimum_balance(TickArray::LEN),
                 TickArray::LEN as u64,
-                amm_program_account.key
+                amm_program_account.key,
             );
         solana_program::program::invoke_signed(
             &last_tick_array_account_account_create_instruction,
@@ -2514,19 +2613,27 @@ pub fn initialize_tick_array_accounts<'a>(
                 admin_account.clone(),
                 last_tick_array_account.clone(),
             ],
-            &[
-                &[
-                    &last_tick_array_index.to_be_bytes(),
-                    amm_token_account.key.as_array(),
-                    &[last_tick_array_bump],
-                ],
-            ]
+            &[&[
+                &last_tick_array_index.to_be_bytes(),
+                amm_token_account.key.as_array(),
+                &[last_tick_array_bump],
+            ]],
         )?;
     }
     if start_tick_array_index == last_tick_array_index {
         let tick_array = &mut first_tick_array_account.data.borrow_mut();
-        update_tick_with_index(tick_array, start_tick, active_liquidity.floor() as u64, true);
-        update_tick_with_index(tick_array, last_tick, active_liquidity.floor() as u64, false);
+        update_tick_with_index(
+            tick_array,
+            start_tick,
+            active_liquidity.floor() as u64,
+            true,
+        );
+        update_tick_with_index(
+            tick_array,
+            last_tick,
+            active_liquidity.floor() as u64,
+            false,
+        );
         // let mut ticks = Box::new([TickState::default(); TICK_ARRAY_SIZE as usize]);
         // ticks[(start_tick % TICK_ARRAY_SIZE) as usize] = TickState {
         //     net_liquidity: active_liquidity as i64,
@@ -2546,12 +2653,27 @@ pub fn initialize_tick_array_accounts<'a>(
     }
     let start_tick_array = &mut first_tick_array_account.data.borrow_mut();
     let last_tick_array = &mut last_tick_array_account.data.borrow_mut();
-    update_tick_with_index(start_tick_array, start_tick, active_liquidity.floor() as u64, true);
-    update_tick_with_index(last_tick_array, last_tick, active_liquidity.floor() as u64, false);
-    let casted_start:&[i64] = bytemuck::cast_slice(start_tick_array);
-    let casted_end:&[i64] = bytemuck::cast_slice(last_tick_array);
+    update_tick_with_index(
+        start_tick_array,
+        start_tick,
+        active_liquidity.floor() as u64,
+        true,
+    );
+    update_tick_with_index(
+        last_tick_array,
+        last_tick,
+        active_liquidity.floor() as u64,
+        false,
+    );
+    let casted_start: &[i64] = bytemuck::cast_slice(start_tick_array);
+    let casted_end: &[i64] = bytemuck::cast_slice(last_tick_array);
 
-    msg!("start_ticks: {:?}, end_ticks: {:?}", casted_start, casted_end);
+    #[cfg(debug_assertions)]
+    msg!(
+        "start_ticks: {:?}, end_ticks: {:?}",
+        casted_start,
+        casted_end
+    );
     // let mut start_ticks = Box::new([TickState::default(); TICK_ARRAY_SIZE as usize]);
     // start_ticks[(start_tick % TICK_ARRAY_SIZE) as usize] = TickState {
     //     net_liquidity: active_liquidity as i64,
@@ -2588,7 +2710,7 @@ pub fn initialize_bitmap_account<'a>(
     amm_program_account: &AccountInfo<'a>,
     amm_token_account_pda: &Pubkey,
     bitmap_index: u32,
-    program_id: &Pubkey
+    program_id: &Pubkey,
 ) -> ProgramResult {
     if bitmap_account.data.borrow().len() == 0 {
         let admin_lp_token_account_create_instruction =
@@ -2597,31 +2719,24 @@ pub fn initialize_bitmap_account<'a>(
                 bitmap_account.key,
                 Rent::get()?.minimum_balance(Bitmap::LEN),
                 Bitmap::LEN as u64,
-                amm_program_account.key
+                amm_program_account.key,
             );
         // let index_bytes = bitmap_index.to_be_bytes(); // Try LE if BE fails
-        msg!(
-            "{:?}, {:?}, {:?}, {:?}",
-            bitmap_index.to_be_bytes(),
-            bitmap_account_bump,
-            bitmap_account.key,
-            amm_token_account_pda
-        );
-        msg!("Current program id: {:?}", program_id);
-        msg!("AMM program account key: {:?}", amm_program_account.key);
         // let pda_bytes = amm_token_account_pda.as_ref();
         // let bump_slice = [bitmap_account_bump];
         solana_program::program::invoke_signed(
             &admin_lp_token_account_create_instruction,
-            &[system_program_account.clone(), admin_account.clone(), bitmap_account.clone()],
             &[
-                &[
-                    b"bitmap",
-                    &bitmap_index.to_be_bytes(),
-                    amm_token_account_pda.as_ref(),
-                    &[bitmap_account_bump],
-                ],
-            ]
+                system_program_account.clone(),
+                admin_account.clone(),
+                bitmap_account.clone(),
+            ],
+            &[&[
+                b"bitmap",
+                &bitmap_index.to_be_bytes(),
+                amm_token_account_pda.as_ref(),
+                &[bitmap_account_bump],
+            ]],
         )?;
     }
 
@@ -2641,17 +2756,30 @@ pub fn change_bit_array_account<'a, 'b>(
     account_iter: &'a mut Iter<'_, AccountInfo<'_>>,
     start_tick_array_index: u32,
     amm_token_account: &AccountInfo<'b>,
-    amm_program_account: &AccountInfo<'b>
+    amm_program_account: &AccountInfo<'b>,
 ) -> core::result::Result<std::cell::Ref<'a, &'a mut [u8]>, ProgramError> {
     let (tick_array_pda, _) = Pubkey::find_program_address(
-        &[&start_tick_array_index.to_be_bytes(), amm_token_account.key.as_array()],
-        amm_program_account.key
+        &[
+            &start_tick_array_index.to_be_bytes(),
+            amm_token_account.key.as_array(),
+        ],
+        amm_program_account.key,
     );
-    msg!("start index: {}, pda: {:?}", start_tick_array_index, tick_array_pda);
+    #[cfg(debug_assertions)]
+    msg!(
+        "start index: {}, pda: {:?}",
+        start_tick_array_index,
+        tick_array_pda
+    );
 
     let array_account = next_account_info(account_iter)?;
 
-    msg!("tick_array_pda: {:?}, array_account: {:?}", tick_array_pda, array_account.key);
+    #[cfg(debug_assertions)]
+    msg!(
+        "tick_array_pda: {:?}, array_account: {:?}",
+        tick_array_pda,
+        array_account.key
+    );
     if tick_array_pda != *array_account.key {
         return Err(AMMError::InvalidTickArray.into());
     }
