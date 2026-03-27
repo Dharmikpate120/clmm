@@ -20,7 +20,7 @@ const RANGES = [
 ]
 
 export default function PriceChart({ market }: { market: Market }) {
-  const [range, setRange] = useState('1D')
+  const [range, setRange] = useState('1Y')
 
   const { data: history = [], isLoading } = useQuery<PriceHistoryPoint[]>({
     queryKey: ['price-history', market.id, range],
