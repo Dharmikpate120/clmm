@@ -16,14 +16,14 @@ const initialState = {
   /* 
  spl-token create-token --decimals 0
  */
-  token_a_mint_account: 'GQFLMUdzy8sCjfg63W9JQWY1fP91sLvprwvZ7nuwriTh',
-  token_b_mint_account: '3pm8ZVVLyrv12uWniKP9zipTRgFGRD1HYsnngdk983Lm',
+  token_a_mint_account: '7NqkGmz7mK7u2GmBAvEXPESgVst5j3ZrB5zRjUFzuqjJ',
+  token_b_mint_account: 'D9o6UuoHWBcByMEV42bE5CeaoN9DMzV1Pv3pb4fXTXaE',
   /* 
-spl-token create-account 3pm8ZVVLyrv12uWniKP9zipTRgFGRD1HYsnngdk983Lm
-spl-token mint 3pm8ZVVLyrv12uWniKP9zipTRgFGRD1HYsnngdk983Lm 200000 -- HNgNHWPezKiUtv9zdD1zSRiqyZJt99nt56EaxU7LeAX8
+spl-token create-account D9o6UuoHWBcByMEV42bE5CeaoN9DMzV1Pv3pb4fXTXaE
+spl-token mint D9o6UuoHWBcByMEV42bE5CeaoN9DMzV1Pv3pb4fXTXaE 200000 -- 5vsAduWkz2v49GFMdfmvuz2nw5hz6GyjpVMPjRVVDHe
 */
-  admin_token_a_account: 'FvwCPiRmfHoRWmQ4nX6ywRa3x2g7PgisbGwyY33xE6uU',
-  admin_token_b_account: 'HNgNHWPezKiUtv9zdD1zSRiqyZJt99nt56EaxU7LeAX8',
+  admin_token_a_account: '6XXBgp4c3Ysjv2boeNpG2ppxVToEmiq8jtxgGdSpgxC4',
+  admin_token_b_account: '5vsAduWkz2v49GFMdfmvuz2nw5hz6GyjpVMPjRVVDHe',
   token_a_amount: '100000',
   token_b_amount: '10000',
   start_tick: '22000',
@@ -101,7 +101,7 @@ export default function SubHeader({ filters, onFiltersChange }: SubHeaderProps) 
     // await signer.signAndSendTransactions([deserializedTx]);
     const result = await sender(instruction!, signer)
 
-    console.log(result)
+    // console.log(result)
     setOpenModal(false)
 
     setFormData(initialState)

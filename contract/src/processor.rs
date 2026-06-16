@@ -142,13 +142,13 @@ impl Processor {
 
         //verifying accounts access--------------------------------------------------------------------------------------
         if admin_account.is_signer == false {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Admin account is not a signer");
             return Err(AMMError::InvalidSigner.into());
         }
 
         if *system_program_account.key != solana_system_interface::program::ID {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!(
                 "Error: System program account is invalid: {:?}",
                 solana_system_interface::program::ID
@@ -157,7 +157,7 @@ impl Processor {
         }
 
         if *spl_token_program_account.key != spl_token_interface::id() {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: SPL token program account is invalid");
             return Err(AMMError::InvalidSPLTokenProgram.into());
         }
@@ -167,54 +167,54 @@ impl Processor {
         // }
         if admin_token_a_account.is_writable == false || admin_token_b_account.is_writable == false
         {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Admin token A account is not writable");
             return Err(AMMError::NotWritable.into());
         }
 
         if token_a_pool_account.is_writable == false || token_b_pool_account.is_writable == false {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Token pool accounts are not writable!");
             return Err(AMMError::NotWritable.into());
         }
         if amm_token_account.is_writable == false {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: AMM token accoutn is not writable!");
             return Err(AMMError::NotWritable.into());
         }
 
         if nft_mint_account.is_writable == false {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: nft mint account is not writable");
             return Err(AMMError::NotWritable.into());
         }
 
         if position_account.is_writable == false {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: position account is not writable");
             return Err(AMMError::NotWritable.into());
         }
         if first_tick_array_account.is_writable == false
             || last_tick_array_account.is_writable == false
         {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: tick array account is not writable");
             return Err(AMMError::NotWritable.into());
         }
 
         //verifying accounts data --------------------------------------------------------------------------------------
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("1");
         let admin_token_a_data = spl_token_interface::state::Account::unpack_from_slice(
             admin_token_a_account.data.borrow().as_ref(),
         )?;
         if admin_token_a_data.is_frozen() {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Admin token A account is frozen");
             return Err(AMMError::TokenAccountFrozen.into());
         }
         if admin_token_a_data.state != AccountState::Initialized {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Admin token A account is not initialized");
             return Err(AMMError::TokenAccountFrozen.into());
         }
@@ -223,34 +223,34 @@ impl Processor {
             admin_token_b_account.data.borrow().as_ref(),
         )?;
         if admin_token_b_data.is_frozen() {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Admin token A account is frozen");
             return Err(AMMError::TokenAccountFrozen.into());
         }
         if admin_token_b_data.state != AccountState::Initialized {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Admin token A account is not initialized");
             return Err(AMMError::TokenAccountNotInitialized.into());
         }
 
         if admin_token_a_data.amount < token_a_amount || admin_token_b_data.amount < token_b_amount
         {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Insufficient token balance in admin account");
             return Err(AMMError::InsufficientTokenBalance.into());
         }
 
         if *token_a_mint_account.key != admin_token_a_data.mint {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Admin token A account mint does not match provided token A mint account");
             return Err(AMMError::InvalidMintAccount.into());
         }
         if *token_b_mint_account.key != admin_token_b_data.mint {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Admin token B account mint does not match provided token B mint account");
             return Err(AMMError::InvalidMintAccount.into());
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("2");
         //initializing amm pool account--------------------------------------------------------------------------------------
         //validating amm token account
@@ -260,11 +260,11 @@ impl Processor {
             program_id,
         );
         if amm_token_account_pda != *amm_token_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid AMM token account provided.");
             return Err(AMMError::InvalidAMMTokenAccount.into());
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("3");
         //creating and initializing amm pool account
         initialize_amm_pool_account(
@@ -282,7 +282,7 @@ impl Processor {
         //INITIALIZE BITMAP ARRAY ACCOUNTS
         let start_bitmap_index = start_tick / 10000;
         let end_bitmap_index = end_tick / 10000;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("4");
         if start_bitmap_index == end_bitmap_index {
             let (start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
@@ -310,7 +310,7 @@ impl Processor {
             );
             activate_bit(&mut start_bitmap_account.data.borrow_mut(), end_tick as u64);
         } else {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("3");
             let (_start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
                 &[
@@ -356,7 +356,7 @@ impl Processor {
             );
             activate_bit(&mut end_bitmap_account.data.borrow_mut(), end_tick as u64);
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("5");
         //INITIALIZING TOKEN POOL ACCOUNTS--------------------------------------------------------------------------------------
         //validating token a pool account
@@ -369,11 +369,11 @@ impl Processor {
             program_id,
         );
         if token_a_pool_account_pda != *token_a_pool_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid token A pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("5.1");
         //validating token b pool account
         let (token_b_pool_account_pda, token_b_pool_account_bump) = Pubkey::find_program_address(
@@ -385,12 +385,12 @@ impl Processor {
             program_id,
         );
         if token_b_pool_account_pda != *token_b_pool_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid token B pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
 
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("5.1");
         // asdfghjkl;'
         initialize_token_pool_accounts(
@@ -409,7 +409,7 @@ impl Processor {
             sysvar_rent_account,
             amm_program_account,
         )?;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("6");
         //Creating NFT accounts--------------------------------------------------------------------------------------
         //asdfghjkl;'
@@ -423,7 +423,7 @@ impl Processor {
         //move this below the calculation to directly set the state asdfghjkl;
         //Creating Position Account--------------------------------------------------------------------------------------
         let mut pa_seeds: Vec<&[u8]> = vec![nft_mint_account.key.as_array()];
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("7");
         let (position_account_pda, position_account_bump) = Pubkey::find_program_address(
             get_lexicographical_tokens_addresses(
@@ -434,7 +434,7 @@ impl Processor {
             amm_program_account.key,
         );
         if position_account_pda != *position_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid position account provided.");
             return Err(AMMError::InvalidPositionAccount.into());
         }
@@ -458,7 +458,7 @@ impl Processor {
                 admin_account.clone(),
             ],
         )?;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("8");
         let token_b_admin_to_pool_transfer_instruction =
             spl_token_interface::instruction::transfer(
@@ -478,22 +478,22 @@ impl Processor {
                 admin_account.clone(),
             ],
         )?;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("9");
         //calculate the initial price is between start and end tick of the provided range and create start tick and end tick array accounts set the active liquidity accordingly based on the start and end tick
         let price_a_by_b = (token_a_amount as f64) / (token_b_amount as f64);
 
         let current_tick = price_to_tick_index(price_a_by_b);
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("{}", current_tick);
         if current_tick < (start_tick as u32) || current_tick > (end_tick as u32) {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error : Initial price is not in between the provided tick range.");
             return Err(AMMError::InitialPriceOutOfRange.into());
         }
         let active_liquidity =
             value_to_sqrt_q6464(((token_a_amount as f64) * (token_b_amount as f64)).sqrt());
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("1");
         // asdfghjkl;'
         initialize_position_account(
@@ -509,7 +509,7 @@ impl Processor {
             end_tick,
             active_liquidity,
         )?;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("2");
         // asdfghjkl;'
         initialize_tick_array_accounts(
@@ -525,9 +525,9 @@ impl Processor {
         )?;
 
         let q6464_sqrt_price = value_to_sqrt_q6464(price_a_by_b);
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("3");
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("{:?}", amm_token_account.owner);
         // updating data of amm token account
         let updated_amm_token_account_data = AMMAccount::Initialized {
@@ -618,7 +618,7 @@ impl Processor {
 
         //17. end_bitmap_account
         let end_bitmap_account = next_account_info(accounts_iter)?;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("1");
         //validating amm token account
         let (amm_token_account_pda, _amm_token_account_bump) = get_lexicographical_token_pda(
@@ -627,7 +627,7 @@ impl Processor {
             program_id,
         );
         if amm_token_account_pda != *amm_token_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid AMM token account provided.");
             return Err(AMMError::InvalidAMMTokenAccount.into());
         }
@@ -642,7 +642,7 @@ impl Processor {
             program_id,
         );
         if token_a_pool_account_pda != *amm_token_a_pool_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid token A pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
@@ -657,7 +657,7 @@ impl Processor {
             program_id,
         );
         if token_b_pool_account_pda != *amm_token_b_pool_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid token B pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
@@ -666,10 +666,10 @@ impl Processor {
         let start_bitmap_index = start_tick / 10000;
         let end_bitmap_index = end_tick / 10000;
 
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("2");
         if start_bitmap_index == end_bitmap_index {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("2.1");
             let (_start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
                 &[
@@ -690,7 +690,7 @@ impl Processor {
                 program_id,
             )?;
         } else {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("2.2");
             let (_start_bitmap_address, start_bitmap_account_bump) = Pubkey::find_program_address(
                 &[
@@ -735,7 +735,7 @@ impl Processor {
         );
         activate_bit(&mut end_bitmap_account.data.borrow_mut(), end_tick as u64);
         //Creating NFT accounts--------------------------------------------------------------------------------------
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("3");
         //asdfghjkl;'
         initialize_nft_accounts(
@@ -745,7 +745,7 @@ impl Processor {
             metaplex_core_program_account,
         )?;
         //calculations starts ------------------------------------------------------------
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("4");
         let amm_token_account_data =
             AMMAccount::unpack_from_slice(&amm_token_account.data.borrow())?;
@@ -765,14 +765,14 @@ impl Processor {
             protocol_fee,
         } = amm_token_account_data
         else {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Amm token account not initialized!");
             return Err(AMMError::AccountNotInitialized.into());
         };
         let current_price = q6464_sqrt_to_value(sqrt_price_a_by_b);
         let mut delta_a: f64 = 0 as f64;
         let mut delta_b: f64 = 0 as f64;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!(
             "5 current_price: {:?}, start_price: {:?}, end_price: {:?}, liquidity: {:?}",
             current_price,
@@ -807,7 +807,7 @@ impl Processor {
                 fee_growth,
                 protocol_fee,
             };
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("new amm data: {:?}", updated_amm_data);
             updated_amm_data.pack_into_slice(&mut amm_token_account.data.borrow_mut());
         }
@@ -821,11 +821,11 @@ impl Processor {
             amm_program_account.key,
         );
         if position_account_pda != *position_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid position account provided.");
             return Err(AMMError::InvalidPositionAccount.into());
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("6");
         //asdfghjkl;'
         initialize_position_account(
@@ -841,7 +841,7 @@ impl Processor {
             end_tick,
             value_to_sqrt_q6464(liquidity),
         )?;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("7");
         //asdfghjkl;'
         initialize_tick_array_accounts(
@@ -855,7 +855,7 @@ impl Processor {
             end_tick,
             liquidity,
         )?;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("8");
         //withdrawing token a from provider to pool
         let token_a_transfer_instruction = spl_token_interface::instruction::transfer(
@@ -875,9 +875,9 @@ impl Processor {
                 liquidity_provider_account.clone(),
             ],
         )?;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("9");
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("delta b: {:?}, delta a: {:?}", delta_b, delta_a);
         //withdrawing token b from provider to pool
         let token_b_transfer_instruction = spl_token_interface::instruction::transfer(
@@ -970,7 +970,7 @@ impl Processor {
         let end_bitmap_account = next_account_info(accounts_iter)?;
 
         //validating amm token account
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("1");
         let (amm_token_account_pda, _amm_token_account_bump) = get_lexicographical_token_pda(
             token_a_mint_account.key,
@@ -978,11 +978,11 @@ impl Processor {
             program_id,
         );
         if amm_token_account_pda != *amm_token_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid AMM token account provided.");
             return Err(AMMError::InvalidAMMTokenAccount.into());
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("2");
         //validating token a pool account
         let (token_a_pool_account_pda, token_a_pool_account_bump) = Pubkey::find_program_address(
@@ -994,7 +994,7 @@ impl Processor {
             program_id,
         );
         if token_a_pool_account_pda != *amm_token_a_pool_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid token A pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
@@ -1009,11 +1009,11 @@ impl Processor {
             program_id,
         );
         if token_b_pool_account_pda != *amm_token_b_pool_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid token B pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("3");
         // calculating the delta a and delta b based on the withdrawn liquidity
         let mut delta_a = 0 as f64;
@@ -1040,7 +1040,7 @@ impl Processor {
 
         let position_account_data =
             PositionAccount::unpack_from_slice(&position_account.data.borrow())?;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("position account data: {:?}", position_account_data);
         let (start_tick, end_tick, liquidity) = match position_account_data {
             PositionAccount::Initialized {
@@ -1058,7 +1058,7 @@ impl Processor {
         if f64_liquidity - (minimum_liquidity as f64) > 0.1
             && f64_liquidity - (minimum_liquidity as f64) < 1.0
         {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("error :{}, {}", f64_liquidity, minimum_liquidity);
             return Err(AMMError::InsufficientTokenBalance.into());
         }
@@ -1090,13 +1090,13 @@ impl Processor {
                 fee_growth,
                 protocol_fee,
             };
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("new amm data: {:?}", updated_amm_data);
             updated_amm_data.pack_into_slice(&mut amm_token_account.data.borrow_mut());
             delta_a = calculate_delta_a(start_price, current_price_f64, withdraw_amount);
             delta_b = calculate_delta_b(current_price_f64, end_price, withdraw_amount);
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("5");
         // invoke the spl - transfer to withdraw token a and token b from the pool to provider
         let token_a_decimals = spl_token_interface::state::Mint::unpack_from_slice(
@@ -1156,7 +1156,7 @@ impl Processor {
                 &[token_b_pool_account_bump],
             ]],
         )?;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("7");
         // update the ticks with net liquidity
         // msg!(
@@ -1172,7 +1172,7 @@ impl Processor {
         // );
         {
             let mut start_tick_account = first_tick_array_account.data.borrow_mut();
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("7.1");
             let mut end_tick_account = last_tick_array_account.data.borrow_mut();
 
@@ -1189,7 +1189,7 @@ impl Processor {
                 true,
             );
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("7.2");
 
         {
@@ -1197,7 +1197,7 @@ impl Processor {
 
             let start_ticks_i64: &[i64] = bytemuck::cast_slice(&start_bitmap_account_data);
             let start_index = (start_tick % 10000) / 8;
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!(
                 "start index: {:?}, {:?}",
                 start_index,
@@ -1216,11 +1216,11 @@ impl Processor {
                 deactivate_bit(&mut end_bitmap_account_data, end_tick as u64);
             }
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("9");
         //update the position account and claim the rent exempt if all withdrawn in the signers account
         if minimum_liquidity == 0 {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("9.1");
             {
                 let mut position_data = position_account.data.borrow_mut();
@@ -1256,7 +1256,7 @@ impl Processor {
                 ]],
             )?;
         } else {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("9.2");
             let mut position_data =
                 PositionAccount::unpack_from_slice(&position_account.data.borrow())?;
@@ -1266,12 +1266,12 @@ impl Processor {
                 ref mut liquidity,
             } = position_data
             {
-                #[cfg(debug_assertions)]
+                #[cfg(feature = "verbose-logs")]
                 msg!("liquidity before: {:?}", q6464_sqrt_to_value(*liquidity));
                 *liquidity = value_to_sqrt_q6464(q6464_sqrt_to_value(*liquidity) - withdraw_amount);
-                #[cfg(debug_assertions)]
+                #[cfg(feature = "verbose-logs")]
                 msg!("liquidity after: {:?}", q6464_sqrt_to_value(*liquidity));
-                #[cfg(debug_assertions)]
+                #[cfg(feature = "verbose-logs")]
                 msg!("withdraw amount : {:?}", withdraw_amount);
             } else {
                 return Err(AMMError::AccountNotInitialized.into());
@@ -1290,7 +1290,7 @@ impl Processor {
         mint_address_in: Pubkey,
         mint_address_out: Pubkey,
     ) -> ProgramResult {
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("swapping!");
         let account_iter = &mut accounts.iter();
 
@@ -1362,11 +1362,11 @@ impl Processor {
             program_id,
         );
         if amm_token_account_pda != *amm_token_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid AMM token account provided.");
             return Err(AMMError::InvalidAMMTokenAccount.into());
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("swapping 2!");
         //validating token a pool account
         let (token_a_pool_account_pda, token_a_pool_account_bump) = Pubkey::find_program_address(
@@ -1378,7 +1378,7 @@ impl Processor {
             program_id,
         );
         if token_a_pool_account_pda != *amm_token_a_pool_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid token A pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
@@ -1392,7 +1392,7 @@ impl Processor {
             program_id,
         );
         if token_b_pool_account_pda != *amm_token_b_pool_account.key {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: Invalid token B pool account provided.");
             return Err(AMMError::InvalidPDA.into());
         }
@@ -1404,11 +1404,11 @@ impl Processor {
             &amm_token_b_pool_account.data.borrow(),
         )?;
         if token_b_pool_data.amount < minimum_amount_out {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Error: token b out amount larger than the pool reserve! ");
             return Err(AMMError::InsufficientTokenBalance.into());
         }
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("swapping 3!");
         // PRICE AND RETURNING TOKEN CALCULATION ---------------------------------------------------------------
         //amm token data
@@ -1450,20 +1450,20 @@ impl Processor {
                 protocol_fee,
             ),
             _ => {
-                #[cfg(debug_assertions)]
+                #[cfg(feature = "verbose-logs")]
                 msg!("Error: Amm token account not initialized!");
                 return Err(AMMError::AccountNotInitialized.into());
             }
         };
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("swapping 4!");
         //bit array one data
         let bitmap_one_enum = bitmap_account_one.data.borrow();
         let bitmap_one = bitmap_one_enum;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("sqrt_price_a_by_b: {:?}", sqrt_price_a_by_b);
         let current_price = q6464_sqrt_to_value(*sqrt_price_a_by_b);
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("current_price:{:?}", current_price);
         let bitarray_index = get_bitarray_index(*current_tick);
 
@@ -1482,7 +1482,7 @@ impl Processor {
         let mut new_current_price = current_price;
         let mut current_liquidity = q6464_sqrt_to_value(*active_liquidity);
         let current_bitmap_index = *current_tick / 10000;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!(
             "current liquidity: {:?}, current_price: {:?}",
             current_liquidity,
@@ -1494,17 +1494,17 @@ impl Processor {
         let mut tick_account: &[i64];
 
         let mut quit = false;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("swapping 5!");
         let active_ticks = get_active_ticks(&bitmap_one);
         // msg!("active_ticks: {:?}", active_ticks);
         let mut is_liquidity_constant = false;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("active_ticks: {:?}", active_ticks);
         //iterating through bitmap_one
         if mint_address_out == *token_b_mint && mint_address_in == *token_a_mint {
             //validating provided bitmaps
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("swapping 5.1");
             {
                 let (bitmap_one_pda, _) = Pubkey::find_program_address(
@@ -1556,7 +1556,7 @@ impl Processor {
                         new_current_price,
                     );
                     let mut upcoming_tick_price = tick_index_to_price(*tick_index);
-                    #[cfg(debug_assertions)]
+                    #[cfg(feature = "verbose-logs")]
                     msg!(
                         "tick index: {:?}, tick Price: {:?}, price with remaining: {:?}",
                         tick_index,
@@ -1570,7 +1570,7 @@ impl Processor {
                     }
 
                     //calculate deltas with tick_prices and current liquidity
-                    #[cfg(debug_assertions)]
+                    #[cfg(feature = "verbose-logs")]
                     msg!("tick price: {:?}", upcoming_tick_price);
                     let delta_a = calculate_delta_a(
                         new_current_price,
@@ -1582,7 +1582,7 @@ impl Processor {
                         upcoming_tick_price,
                         current_liquidity,
                     );
-                    #[cfg(debug_assertions)]
+                    #[cfg(feature = "verbose-logs")]
                     msg!("delta a: {:?}, delta b: {:?}", delta_a, delta_b);
                     remaining_token_in -= delta_a;
                     total_token_out += delta_b;
@@ -1592,7 +1592,7 @@ impl Processor {
 
                     {
                         tick_array_index = tick_index / 88;
-                        #[cfg(debug_assertions)]
+                        #[cfg(feature = "verbose-logs")]
                         msg!("tick_array_index: {:?}", tick_array_index);
                         //dropping to free the mutable reference to the account_iter and its internal data state causing the mutable reference to live.
                         // drop(tick_account);
@@ -1634,7 +1634,7 @@ impl Processor {
                     &[swapper_account.key],
                     ((amount_in as f64) - remaining_token_in).ceil() as u64,
                 )?;
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("swapper to pool");
             solana_program::program::invoke(
                 &token_a_admin_to_pool_transfer_instruction,
@@ -1653,7 +1653,7 @@ impl Processor {
                 &[amm_token_b_pool_account.key],
                 total_token_out.ceil() as u64,
             )?;
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("pool to swapper");
             solana_program::program::invoke_signed(
                 &token_b_transfer_instruction,
@@ -1671,7 +1671,7 @@ impl Processor {
                 ]],
             )?;
         } else if mint_address_out == *token_a_mint && mint_address_in == *token_b_mint {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("swapping 5.2!");
             //validating provided bitmaps asdfghjkl;'
             {
@@ -1711,7 +1711,7 @@ impl Processor {
             for tick_index_tail in active_ticks.iter().rev() {
                 if !quit {
                     let tick_index = &(bitarray_index * 10000 + tick_index_tail);
-                    #[cfg(debug_assertions)]
+                    #[cfg(feature = "verbose-logs")]
                     msg!(
                         "tick_index: {:?}, current_tick: {:?}, current_price: {:?}",
                         *tick_index,
@@ -1735,7 +1735,7 @@ impl Processor {
                     //calculate the tick_index and tick_price for the active tick
                     let mut upcoming_tick_price = tick_index_to_price(*tick_index);
 
-                    #[cfg(debug_assertions)]
+                    #[cfg(feature = "verbose-logs")]
                     msg!(
                         "tick_price: {}, remaining_in_price: {}, current_liquidity: {}",
                         upcoming_tick_price,
@@ -1765,7 +1765,7 @@ impl Processor {
 
                     remaining_token_in -= delta_b;
                     total_token_out += delta_a;
-                    #[cfg(debug_assertions)]
+                    #[cfg(feature = "verbose-logs")]
                     msg!(
                         "delta_a: {}, delta_b: {}, remaining_token_in: {}, total_token_out: {}",
                         delta_a,
@@ -1792,7 +1792,7 @@ impl Processor {
                             amm_token_account,
                             amm_program_account,
                         )?);
-                        #[cfg(debug_assertions)]
+                        #[cfg(feature = "verbose-logs")]
                         msg!(
                             "breaking: tick_array_index: {:?}, tick_index: {:?}",
                             tick_array_index,
@@ -1823,7 +1823,7 @@ impl Processor {
                     &[swapper_account.key],
                     ((amount_in as f64) - remaining_token_in).ceil() as u64,
                 )?;
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("swapper to pool");
             solana_program::program::invoke(
                 &token_b_provider_to_pool_transfer_instruction,
@@ -1843,7 +1843,7 @@ impl Processor {
                     &[amm_token_a_pool_account.key],
                     total_token_out.ceil() as u64,
                 )?;
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("pool to swapper");
             solana_program::program::invoke_signed(
                 &token_a_pool_to_provider_transfer_instruction,
@@ -1866,7 +1866,7 @@ impl Processor {
         *sqrt_price_a_by_b = value_to_sqrt_q6464(new_current_price);
 
         amm_token_enum.pack_into_slice(&mut amm_token_account.data.borrow_mut());
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!(
             "amount in : {:?} - {:?}, amount out: {:?}",
             amount_in,
@@ -2345,7 +2345,7 @@ pub fn initialize_nft_accounts<'a>(
     //     )?;
     //     msg!("created account");
     // }
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "verbose-logs")]
     msg!("mpl core program id: {:?}", nft_mint_account.data);
 
     let accounts: Vec<AccountMeta> = vec![
@@ -2426,7 +2426,7 @@ pub fn initialize_nft_accounts<'a>(
     let mut serialized_data = vec![0];
     data.serialize(&mut serialized_data)
         .expect("cannot serialize metaplex data!");
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "verbose-logs")]
     msg!("{:?}", serialized_data);
 
     let instruction = solana_program::instruction::Instruction {
@@ -2476,7 +2476,7 @@ pub fn initialize_position_account<'a>(
                 amm_program_account.key,
             );
 
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!(
             "position account data: {:?}",
             position_account.data.borrow().len()
@@ -2499,7 +2499,7 @@ pub fn initialize_position_account<'a>(
     }
     let position_account_data =
         PositionAccount::unpack_from_slice(position_account.data.borrow().as_ref())?;
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "verbose-logs")]
     msg!("deserialized!");
     match position_account_data {
         PositionAccount::Uninitialized => {
@@ -2512,7 +2512,7 @@ pub fn initialize_position_account<'a>(
                 .pack_into_slice(&mut position_account.data.borrow_mut());
         }
         PositionAccount::Initialized { .. } => {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "verbose-logs")]
             msg!("Position account already initialized");
             return Err(AMMError::AccountAlreadyInitialized.into());
         }
@@ -2550,7 +2550,7 @@ pub fn initialize_tick_array_accounts<'a>(
         amm_program_account.key,
     );
 
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "verbose-logs")]
     msg!(
         "{}, {}, {}",
         last_tick_array_index,
@@ -2559,13 +2559,13 @@ pub fn initialize_tick_array_accounts<'a>(
     );
     //validating first tick array account
     if first_tick_array_pda != *first_tick_array_account.key {
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("Error: Invalid first tick array account provided.");
         return Err(AMMError::InvalidPDA.into());
     }
     //validating last tick array account
     if last_tick_array_pda != *last_tick_array_account.key {
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "verbose-logs")]
         msg!("Error: Invalid last tick array account provided.");
         return Err(AMMError::InvalidPDA.into());
     }
@@ -2668,7 +2668,7 @@ pub fn initialize_tick_array_accounts<'a>(
     let casted_start: &[i64] = bytemuck::cast_slice(start_tick_array);
     let casted_end: &[i64] = bytemuck::cast_slice(last_tick_array);
 
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "verbose-logs")]
     msg!(
         "start_ticks: {:?}, end_ticks: {:?}",
         casted_start,
@@ -2765,7 +2765,7 @@ pub fn change_bit_array_account<'a, 'b>(
         ],
         amm_program_account.key,
     );
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "verbose-logs")]
     msg!(
         "start index: {}, pda: {:?}",
         start_tick_array_index,
@@ -2774,7 +2774,7 @@ pub fn change_bit_array_account<'a, 'b>(
 
     let array_account = next_account_info(account_iter)?;
 
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "verbose-logs")]
     msg!(
         "tick_array_pda: {:?}, array_account: {:?}",
         tick_array_pda,
